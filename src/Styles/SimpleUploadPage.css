@@ -1,0 +1,244 @@
+/* SimpleUploadPage.css */
+
+/* Reset and Base Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Main Upload Page */
+.upload-page {
+  min-height: 100vh;
+  background: #f8f9fa;
+  display: flex;
+  align-items: flex-start; /* Changed from center to flex-start */
+  justify-content: center;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  padding: 5px 20px 20px 20px; /* Reduced top padding */
+}
+
+/* Upload Container - Centered */
+.upload-container {
+  width: 100%;
+  max-width: 600px;
+  text-align: center;
+  margin-top: 0; /* Remove any extra margin */
+}
+
+/* Header Section */
+.upload-header {
+  margin-bottom: 40px;
+}
+
+.upload-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #2d3748;
+  margin-bottom: 16px;
+}
+
+.upload-subtitle {
+  font-size: 1.1rem;
+  color: #718096;
+  line-height: 1.6;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+/* Upload Card */
+.upload-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+  border: 1px solid #e2e8f0;
+  padding: 40px;
+}
+
+/* Drop Zone */
+.drop-zone {
+  border: 2px dashed #cbd5e0;
+  border-radius: 8px;
+  padding: 60px 30px;
+  background: #f7fafc;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.drop-zone:hover {
+  border-color: #4299e1;
+  background: #ebf8ff;
+}
+
+.drop-zone.dragging {
+  border-color: #3182ce;
+  background: #e6fffa;
+}
+
+/* File Input */
+.file-input {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+}
+
+/* Drop Zone Label */
+.drop-zone-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  cursor: pointer;
+  pointer-events: none;
+}
+
+/* Upload Icon */
+.upload-icon {
+  margin-bottom: 8px;
+}
+
+.folder-icon {
+  width: 80px;
+  height: 80px;
+  background: #4299e1;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  color: white;
+  margin: 0 auto;
+  transition: transform 0.3s ease;
+}
+
+.drop-zone:hover .folder-icon {
+  transform: scale(1.05);
+}
+
+/* Text Elements */
+.drop-text {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin: 0;
+}
+
+.browse-text {
+  font-size: 1rem;
+  color: #718096;
+  margin: 0;
+}
+
+/* File Types Badge */
+.file-types-badge {
+  background: #4299e1;
+  color: white;
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-top: 8px;
+}
+
+/* Upload Progress */
+.upload-progress {
+  padding: 60px 30px;
+  text-align: center;
+}
+
+/* Progress Bar */
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: #edf2f7;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #4299e1;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+/* Progress Text */
+.progress-text {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #4299e1;
+  margin-bottom: 12px;
+}
+
+.progress-label {
+  font-size: 1rem;
+  color: #718096;
+  margin: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .upload-page {
+    padding: 15px;
+  }
+  
+  .upload-title {
+    font-size: 2rem;
+  }
+  
+  .upload-subtitle {
+    font-size: 1rem;
+  }
+  
+  .upload-card {
+    padding: 30px 20px;
+  }
+  
+  .drop-zone {
+    padding: 40px 20px;
+  }
+  
+  .folder-icon {
+    width: 60px;
+    height: 60px;
+    font-size: 24px;
+  }
+  
+  .drop-text {
+    font-size: 1.3rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .upload-title {
+    font-size: 1.8rem;
+  }
+  
+  .upload-card {
+    padding: 20px 15px;
+  }
+  
+  .drop-zone {
+    padding: 30px 15px;
+  }
+  
+  .folder-icon {
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+  }
+  
+  .drop-text {
+    font-size: 1.2rem;
+  }
+  
+  .browse-text {
+    font-size: 0.9rem;
+  }
+}

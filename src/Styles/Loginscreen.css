@@ -1,0 +1,436 @@
+/* Login Screen Styles */
+.login-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f0fdfa 0%, #e0e7ff 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Remove background decorations */
+.background-decoration,
+.features-preview,
+.divider-container,
+.social-login-container {
+  display: none !important;
+}
+
+/* Make text and icons darker for white bg */
+.app-title {
+  color: #1e293b !important;
+}
+.input-label,
+.remember-label,
+.signup-text {
+  color: #334155 !important;
+}
+
+/* Main wrapper */
+.login-wrapper {
+  width: 100%;
+  max-width: 30rem;         /* Increased width */
+  background: #fff;
+  border-radius: 1rem;
+  box-shadow: 0 8px 32px rgba(31, 41, 55, 0.12);
+  padding: 1rem 2rem;       /* More horizontal padding, less vertical */
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Header section */
+.header-section {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.logo-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.logo-icon {
+  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  padding: 0.75rem;
+  border-radius: 1rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo-svg {
+  width: 2rem;
+  height: 2rem;
+  color: white;
+}
+
+.app-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: white;
+  margin: 0.5rem 0;
+}
+
+.app-subtitle {
+  color: #cbd5e1;
+  margin: 0;
+}
+
+/* Form container */
+.login-form-container {
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  padding: 1rem 0 0 0;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Input groups */
+.input-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.input-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #e2e8f0;
+  margin-bottom: 0.5rem;
+}
+
+.input-wrapper {
+  position: relative;
+}
+
+.input-icon {
+  position: absolute;
+  top: 50%;
+  left: 0.75rem;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.icon-svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #94a3b8;
+}
+
+.input-field {
+  display: block;
+  width: 100%;
+  padding: 0.75rem 0.75rem 0.75rem 2.5rem;
+  border: 1.5px solid #cbd5e1;      /* Light gray border */
+  border-radius: 0.5rem;
+  background: #f8fafc;               /* Very light background */
+  color: #1e293b;                    /* Dark text */
+  font-size: 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: #3b82f6;             /* Blue border on focus */
+  background: #fff;
+  box-shadow: 0 0 0 2px #dbeafe;     /* Subtle blue glow */
+}
+
+/* Password toggle button */
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.75rem;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.password-toggle:hover {
+  color: #e2e8f0;
+}
+
+/* Form options */
+.form-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.remember-me-container {
+  display: flex;
+  align-items: center;
+}
+
+.remember-checkbox {
+  width: 1rem;
+  height: 1rem;
+  margin-right: 0.5rem;
+  accent-color: #3b82f6;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 0.25rem;
+}
+
+.remember-label {
+  font-size: 0.875rem;
+  color: #cbd5e1;
+  cursor: pointer;
+}
+
+.forgot-password-link {
+  font-size: 0.875rem;
+  color: #60a5fa;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.forgot-password-link:hover {
+  color: #93c5fd;
+}
+
+/* Login button */
+.login-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1rem;
+  border: none;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  color: white;
+  font-weight: 500;
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 1rem;
+}
+
+.login-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #1d4ed8 0%, #6d28d9 100%);
+  transform: scale(1.02);
+}
+
+.login-button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.login-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.loading-content {
+  display: flex;
+  align-items: center;
+}
+
+.spinner {
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid transparent;
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-right: 0.5rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.button-content {
+  display: flex;
+  align-items: center;
+}
+
+.button-icon {
+  margin-left: 0.5rem;
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Divider */
+.divider-container {
+  margin-top: 1.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.divider-line {
+  flex: 1;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.divider-text {
+  padding: 0 1rem;
+  font-size: 0.875rem;
+  color: #94a3b8;
+}
+
+/* Social login */
+.social-login-container {
+  margin-top: 1.5rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.social-button {
+  width: 100%;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0.625rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #e2e8f0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.social-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.social-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-right: 0.5rem;
+}
+
+/* Sign up section */
+.signup-section {
+  text-align: center;
+  margin-top: 1.5rem;
+}
+
+.signup-text {
+  color: #94a3b8;
+  margin: 0;
+}
+
+.signup-link {
+  color: #60a5fa;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.signup-link:hover {
+  color: #93c5fd;
+}
+
+/* Features preview */
+.features-preview {
+  margin-top: 2rem;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  text-align: center;
+}
+
+.feature-item {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(4px);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+}
+
+.feature-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.feature-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  margin: 0 auto 0.5rem;
+  display: block;
+}
+
+.feature-item:nth-child(1) .feature-icon {
+  color: #60a5fa;
+}
+
+.feature-item:nth-child(2) .feature-icon {
+  color: #34d399;
+}
+
+.feature-item:nth-child(3) .feature-icon {
+  color: #a78bfa;
+}
+
+.feature-text {
+  font-size: 0.75rem;
+  color: #cbd5e1;
+  margin: 0;
+}
+
+/* Responsive design */
+@media (max-width: 480px) {
+  .login-container {
+    padding: 0.5rem;
+  }
+  
+  .login-form-container {
+    padding: 1.5rem;
+  }
+  
+  .app-title {
+    font-size: 1.5rem;
+  }
+  
+  .features-preview {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+  
+  .social-login-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Focus states for accessibility */
+.input-field:focus,
+.remember-checkbox:focus,
+.login-button:focus,
+.social-button:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Smooth transitions */
+* {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}

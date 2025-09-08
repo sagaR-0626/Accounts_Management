@@ -1,0 +1,647 @@
+/* Organizations Container */
+.organizations-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f8fafc 0%, #e0f2fe 50%, #e8eaf6 100%);
+}
+
+/* Header Styles */
+.organizations-header {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  padding: 1.25rem 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.header-content {
+  max-width: 72rem;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.header-icon {
+  width: 3rem;
+  height: 3rem;
+  background: linear-gradient(135deg, #2563eb, #9333ea);
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 25px rgba(37, 99, 235, 0.3);
+}
+
+.header-icon .icon {
+  width: 1.75rem;
+  height: 1.75rem;
+  color: white;
+}
+
+.header-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+}
+
+.header-subtitle {
+  color: #6b7280;
+  margin: 0;
+  font-size: 1rem;
+}
+
+.logout-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  border: none;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+  font-weight: 500;
+}
+
+.logout-btn:hover {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
+  transform: scale(1.05);
+}
+
+.btn-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* Main Content */
+.main-content {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 3rem 1.5rem;
+}
+
+/* Cards container as a grid with 2 columns */
+.cards-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  justify-items: center;
+  align-items: stretch;
+  margin-top: 3rem;
+}
+
+/* Organization Cards - modern, big, and interactive */
+.organization-card {
+  width: 100%;
+  min-width: 340px;
+  max-width: 600px;
+  min-height: 18rem;
+  background: linear-gradient(135deg, #f8fafc 80%, #e0e7ff 100%);
+  border-radius: 2.5rem;
+  box-shadow: 0 8px 32px rgba(59, 130, 246, 0.10), 0 1.5px 8px rgba(31,41,55,0.06);
+  padding: 2.8rem 2.8rem;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  transition: 
+    transform 0.18s cubic-bezier(.4,2,.6,1),
+    box-shadow 0.18s,
+    border-color 0.18s;
+  border: 2.5px solid #e0e7ef;
+  position: relative;
+  overflow: hidden;
+}
+
+.organization-card:hover {
+  transform: translateY(-10px) scale(1.035);
+  box-shadow: 0 20px 48px rgba(59, 130, 246, 0.18), 0 4px 24px rgba(31,41,55,0.10);
+  border-color: #60a5fa;
+  background: linear-gradient(135deg, #e0e7ff 70%, #f0fdfa 100%);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 2.5rem;
+  width: 100%;
+}
+
+.card-icon {
+  font-size: 4rem;
+  width: 5.5rem;
+  height: 5.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #e0e7ff 60%, #f1f5f9 100%);
+  border-radius: 1.5rem;
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.10);
+  margin-right: 1.5rem;
+}
+
+.card-title-section {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.card-title {
+  font-size: 2.4rem;
+  font-weight: 800;
+  margin: 0;
+  color: #1e293b;
+  letter-spacing: -1px;
+}
+
+.card-subtitle {
+  font-size: 1.25rem;
+  color: #64748b;
+  margin-top: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+
+/* Optional: subtle arrow on hover */
+.organization-card::after {
+  content: "→";
+  position: absolute;
+  right: 2.2rem;
+  top: 50%;
+  transform: translateY(-50%) scale(1.2);
+  font-size: 2.2rem;
+  color: #60a5fa;
+  opacity: 0;
+  transition: opacity 0.2s, right 0.2s;
+  pointer-events: none;
+}
+.organization-card:hover::after {
+  opacity: 1;
+  right: 1.2rem;
+}
+
+@media (max-width: 900px) {
+  .cards-container {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+  .organization-card {
+    max-width: 95vw;
+    min-height: 13rem;
+    padding: 2rem 1.2rem;
+  }
+  .card-header {
+    gap: 1.2rem;
+  }
+  .card-icon {
+    width: 4rem;
+    height: 4rem;
+    font-size: 2.5rem;
+    margin-right: 1rem;
+  }
+  .card-title {
+    font-size: 1.7rem;
+  }
+  .card-subtitle {
+    font-size: 1rem;
+  }
+}
+
+/* Background Pattern */
+.card-bg-pattern {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 5rem;
+  height: 10rem;
+  border-radius: 50%;
+  transform: translate(5rem, -5rem);
+  transition: transform 0.7s ease;
+  z-index: 1;
+}
+
+.card-blue .card-bg-pattern {
+  background: linear-gradient(135deg, #2563eb, #06b6d4);
+  opacity: 0.05;
+}
+
+.card-green .card-bg-pattern {
+  background: linear-gradient(135deg, #059669, #0d9488);
+  opacity: 0.05;
+}
+
+.organization-card:hover .card-bg-pattern {
+  transform: translate(5rem, -5rem) scale(1.5);
+}
+
+/* Card Header */
+.card-header {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;         /* Reduced from 1.5rem */
+}
+
+.card-header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.card-icon {
+  width: 4.5rem;               /* Reduced from 4rem */
+  height: 4.5rem;
+  font-size: 2.5rem;           /* Reduced from 1.5rem */
+  border-radius: 0.75rem;      /* Reduced from 1rem */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.icon-blue {
+  background: linear-gradient(135deg, #2563eb, #06b6d4);
+}
+
+.icon-green {
+  background: linear-gradient(135deg, #059669, #0d9488);
+}
+
+.organization-card:hover .card-icon {
+  transform: scale(1.1) rotate(12deg);
+}
+
+.card-title {
+  font-size: 2rem;           /* Reduced from 1.5rem */
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 0.25rem 0;
+  transition: color 0.3s ease;
+}
+
+.organization-card:hover .card-title {
+  color: #3b82f6;
+}
+
+.card-subtitle {
+  font-size: 1.1rem;
+  color: #6b7280;
+  font-weight: 500;
+  margin: 0;
+}
+
+.card-arrow {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.organization-card:hover .card-arrow {
+  opacity: 1;
+}
+
+.arrow-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: #3b82f6;
+}
+
+/* Financial Cards */
+.financial-cards {
+  position: relative;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;                 /* Reduced from 1rem */
+  margin-bottom: 1rem;         /* Reduced from 1.5rem */
+}
+
+.financial-card {
+  border-radius: 0.75rem;      /* Reduced from 1rem */
+  padding: 0.75rem;            /* Reduced from 1.25rem */
+}
+
+.revenue-card {
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.expenses-card {
+  background: linear-gradient(135deg, #fed7aa, #fdba74);
+  border-color: rgba(251, 146, 60, 0.3);
+}
+
+.financial-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.financial-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.revenue-card .financial-icon {
+  color: #2563eb;
+}
+
+.expenses-card .financial-icon {
+  color: #ea580c;
+}
+
+.financial-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.revenue-card .financial-label {
+  color: #1d4ed8;
+}
+
+.expenses-card .financial-label {
+  color: #c2410c;
+}
+
+.financial-amount {
+  font-size: 1rem;             /* Reduced from 1.25rem */
+  font-weight: 700;
+  margin: 0 0 0.25rem 0;
+}
+
+.revenue-card .financial-amount {
+  color: #1e40af;
+}
+
+.expenses-card .financial-amount {
+  color: #9a3412;
+}
+
+.financial-detail {
+  font-size: 0.75rem;
+  margin: 0;
+}
+
+.revenue-card .financial-detail {
+  color: #2563eb;
+}
+
+.expenses-card .financial-detail {
+  color: #ea580c;
+}
+
+/* Profit/Loss Section */
+.profit-section {
+  position: relative;
+  z-index: 10;
+  border-radius: 0.75rem;      /* Reduced from 1rem */
+  padding: 1rem;               /* Reduced from 1.5rem */
+  color: white;
+  margin-bottom: 1rem;         /* Reduced from 1.5rem */
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+.profit-positive {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.profit-negative {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.profit-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.profit-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.profit-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.profit-label {
+  font-weight: 600;
+}
+
+.profit-amount {
+  font-size: 1.2rem;           /* Reduced from 1.875rem */
+  font-weight: 700;
+  margin: 0 0 0.25rem 0;
+}
+
+.profit-margin {
+  font-size: 0.875rem;
+  opacity: 0.9;
+  margin: 0;
+}
+
+.profit-right {
+  text-align: right;
+}
+
+.profit-emoji {
+  font-size: 1.5rem;           /* Reduced from 2.5rem */
+  margin-bottom: 0.5rem;
+}
+
+.profit-status {
+  font-size: 0.875rem;
+  opacity: 0.9;
+  margin: 0;
+}
+
+/* Project Section */
+.project-section {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f9fafb;
+  border-radius: 0.75rem;      /* Reduced from 1rem */
+  padding: 0.75rem;            /* Reduced from 1.25rem */
+}
+
+.project-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.project-icon {
+  width: 1.5rem;               /* Reduced from 2.5rem */
+  height: 1.5rem;
+  border-radius: 0.5rem;       /* Reduced from 0.75rem */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.briefcase-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #7c3aed;
+}
+
+.project-label {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.project-count {
+  font-size: 1.1rem;           /* Reduced from 1.5rem */
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+}
+
+.project-right {
+  text-align: right;
+}
+
+.project-hint {
+  font-size: 0.875rem;
+  color: #9ca3af;
+  margin: 0;
+}
+
+.project-action {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #3b82f6;
+  margin: 0;
+}
+
+/* Hover Effect Overlay */
+.hover-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0), rgba(147, 51, 234, 0));
+  border-radius: 1.5rem;
+  pointer-events: none;
+  transition: all 0.5s ease;
+}
+
+.organization-card:hover .hover-overlay {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(147, 51, 234, 0.05));
+}
+
+/* Welcome Section */
+.welcome-section {
+  margin-top: 3rem;
+  text-align: center;
+}
+
+.welcome-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(8px);
+  border-radius: 1rem;
+  padding: 2rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  display: inline-block;
+}
+
+.welcome-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 0.5rem 0;
+}
+
+.welcome-text {
+  color: #6b7280;
+  margin: 0;
+}
+
+/* Sub-Organizations Styles */
+.sub-orgs-row {
+  display: flex;
+  gap: 1.5rem;
+  margin: 1.5rem 0 0 4.5rem;
+}
+
+.sub-org-card {
+  background: #f1f5f9;
+  border-radius: 0.75rem;
+  padding: 1rem 2.5rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.07);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+.sub-org-card:hover {
+  background: #dbeafe;
+  color: #1e40af;
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.13);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .main-content {
+    padding: 2rem 1rem;
+  }
+  
+  .financial-cards {
+    grid-template-columns: 1fr;
+  }
+  
+  .profit-content {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+  
+  .project-section {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+  
+  .header-content {
+    flex-direction: column;
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .logout-btn span {
+    display: none;
+  }
+  
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .card-arrow {
+    align-self: flex-end;
+  }
+}

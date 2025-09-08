@@ -1,0 +1,157 @@
+
+.arap-dashboard-container {
+  max-width: 1000px;
+  margin: 2rem auto;
+  padding: 0;
+  background: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.arap-cards-row {
+  display: flex;
+  gap: 2rem;
+  justify-content: center;
+  margin-bottom: 2.5rem;
+  width: 100%;
+}
+
+.arap-card {
+  flex: 1 1 0;
+  min-width: 350px;
+  max-width: 700px;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  padding: 3.5rem 2.5rem 2.5rem 2.5rem;
+  cursor: pointer;
+  transition: box-shadow 0.2s, background 0.2s, transform 0.15s;
+  border: 2px solid transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 0.5rem;
+}
+
+.arap-card.active {
+  background: #e0f7fa;
+  border-color: #06b6d4;
+  box-shadow: 0 8px 32px 0 rgba(6,182,212,0.13);
+  transform: translateY(-6px) scale(1.04);
+}
+
+.ar-card .arap-card-value {
+  color: #10b981 !important;
+}
+.ap-card .arap-card-value {
+  color: #ef4444 !important;
+}
+
+.arap-card-title {
+  font-size: 2.1rem;
+  font-weight: 700;
+  margin-bottom: 1.2rem;
+  color: #374151;
+  letter-spacing: 0.5px;
+}
+.arap-card-value {
+  font-size: 3.2rem;
+  font-weight: 800;
+  margin-bottom: 0.7rem;
+  letter-spacing: 1px;
+}
+.arap-card-desc {
+  font-size: 1.25rem;
+  color: #6b7280;
+  margin-bottom: 0.2rem;
+}
+
+.arap-breakdown-section {
+  margin-top: 2.5rem;
+  background: #f9fafb;
+  border-radius: 20px;
+  padding: 2.5rem 2rem 2rem 2rem;
+  box-shadow: 0 4px 20px 0 rgba(0,0,0,0.06);
+}
+@media (max-width: 1024px) {
+  .arap-dashboard-container {
+    max-width: 100vw;
+    padding: 0;
+  }
+  .arap-cards-row {
+    flex-direction: column;
+    gap: 1.5rem;
+    align-items: stretch;
+  }
+  .arap-card {
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+    padding: 2.5rem 1.2rem 1.5rem 1.2rem;
+  }
+}
+
+.section-header h3 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.2rem;
+}
+.section-header p {
+  color: #6b7280;
+  font-size: 1rem;
+  margin-bottom: 1.2rem;
+}
+
+.transactions-table {
+  width: 100%;
+  margin-top: 1.2rem;
+}
+.table-header {
+  display: flex;
+  background: #e5e7eb;
+  border-radius: 8px 8px 0 0;
+  font-weight: 600;
+  color: #374151;
+  font-size: 1rem;
+  padding: 0.7rem 0.5rem;
+}
+.header-cell {
+  flex: 1;
+  text-align: left;
+  padding: 0 0.5rem;
+}
+.table-body {
+  background: #fff;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 1px 4px 0 rgba(0,0,0,0.02);
+}
+.table-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 1rem;
+  color: #374151;
+  padding: 0.7rem 0.5rem;
+  transition: background 0.15s;
+}
+.table-row:last-child {
+  border-bottom: none;
+}
+.table-cell {
+  flex: 1;
+  padding: 0 0.5rem;
+  word-break: break-word;
+}
+.table-cell[data-label="Amount"] {
+  font-weight: 600;
+}
+.empty-state {
+  text-align: center;
+  color: #9ca3af;
+  padding: 2rem 0 1rem 0;
+}
+.empty-icon {
+  font-size: 2.2rem;
+  margin-bottom: 0.5rem;
+}
