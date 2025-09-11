@@ -70,6 +70,17 @@ CREATE TABLE IF NOT EXISTS `Transactions` (
       ON DELETE CASCADE
 );
 
+-- AuditUploads table for audit file uploads
+CREATE TABLE IF NOT EXISTS `AuditUploads` (
+  `AuditID` INT AUTO_INCREMENT PRIMARY KEY,
+  `UploaderEmail` VARCHAR(255),
+  `UploadDate` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `FileName` VARCHAR(255),
+  `RowCount` INT,
+  `OrganizationID` INT,
+  `Notes` TEXT
+);
+
 -- Sample data inserts (run after all tables exist)
 -- INSERT INTO Organizations (Name, Type) VALUES
 --   ('TechSoft Solutions',      'Software Company'),

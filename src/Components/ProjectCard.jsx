@@ -21,15 +21,15 @@ const ProjectCard = ({ project, onSelect }) => {
       <div className="project-stats">
         <div className="stat-item">
           <div className="stat-label">A/R</div>
-          <div className="stat-value">${(project.ar / 1000).toFixed(1)}k</div>
+          <div className="stat-value">{(project.ar / 1000).toFixed(1)}k</div>
         </div>
         <div className="stat-item">
           <div className="stat-label">A/P</div>
-          <div className="stat-value">${(project.ap / 1000).toFixed(1)}k</div>
+          <div className="stat-value">{(project.ap / 1000).toFixed(1)}k</div>
         </div>
         <div className="stat-item">
           <div className="stat-label">Profit/Loss</div>
-          <div className={`stat-value ${project.profit >= 0 ? 'profit' : 'loss'}`}>
+          <div className={`stat-value {project.profit >= 0 ? 'profit' : 'loss'}`}>
             ${Math.abs(project.profit / 1000).toFixed(1)}k
           </div>
         </div>

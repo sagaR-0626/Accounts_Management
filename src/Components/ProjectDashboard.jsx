@@ -117,6 +117,9 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
     Amount: ''
   });
 
+  // New state for dashboard view
+  const [dashboardView, setDashboardView] = useState('all'); // 'all', 'ar', 'ap'
+
   useEffect(() => {
     // extract fetch so we can call it after POST and from a refresh button
     async function fetchTransactions() {
@@ -260,13 +263,47 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
     setModalOpen(true);
   };
 
+  // 1. Define helpers FIRST
+  function isAR(tx) {
+    return tx.expenseType && ['receipt', 'income'].includes(tx.expenseType.toLowerCase());
+  }
+  function isAP(tx) {
+    return tx.expenseType && tx.expenseType.toLowerCase() === 'expense';
+  }
+
+  // categoryTotals and spendsByCategory should be defined here
+  
+
+  // 2. Filtered helpers
+  const filteredCategoryTotals = dashboardView === 'all'
+    ? categoryTotals
+    : categoryTotals
+        .map(c => {
+          const txs = spendsByCategory[c.category] || [];
+          const filteredTxs = dashboardView === 'ar'
+            ? txs.filter(isAR)
+            : txs.filter(isAP);
+          return {
+            category: c.category,
+            total: filteredTxs.reduce((sum, tx) => sum + Number(tx.amount || 0), 0),
+            txs: filteredTxs
+          };
+        })
+        .filter(c => c.total > 0);
+
+  const filteredSpendsByCategory = {};
+  filteredCategoryTotals.forEach(c => {
+    filteredSpendsByCategory[c.category] = c.txs;
+  });
+
+  // Chart
   const doughnutData = {
-    labels: categoryTotals.map(c => c.category),
+    labels: filteredCategoryTotals.map(c => c.category),
     datasets: [{
-      data: categoryTotals.map(c => c.total),
+      data: filteredCategoryTotals.map(c => c.total),
       backgroundColor: [
         '#3b82f6', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#06b6d4', '#f59e0b'
-      ].slice(0, categoryTotals.length)
+      ].slice(0, filteredCategoryTotals.length)
     }]
   };
 
@@ -274,82 +311,122 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
     <div className="dashboard-main">
       <div className="dashboard-container">
         {/* Header */}
-        <div className="project-header">
-          <button onClick={onBack} className="back-btn">
-            <ArrowLeft size={20} />
-            Back
+        <div className="project-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+            <button onClick={onBack} className="back-btn">
+              <ArrowLeft size={20} />
+              Back
+            </button>
+            <div>
+              <h1 style={{ margin: 0 }}>
+                {projectState.Name || projectState.name || projectState.ProjectName || project.Name}
+              </h1>
+              <p style={{ margin: 0, fontSize: 14 }}>
+                {projectState.ProjectID ?? projectState.id ?? project.ProjectID ?? project.id} - {organization.name}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setAddModalOpen(true)}
+            style={{
+              border: 'none',
+              background: '#2563eb',
+              color: '#fff',
+              padding: '8px 12px',
+              borderRadius: 6,
+              cursor: 'pointer'
+            }}
+          >
+            + Add Transaction
           </button>
-
-          <div style={{ marginLeft: 12 }}>
-            <button onClick={() => setAddModalOpen(true)} style={{
-              border: 'none', background: '#2563eb', color: '#fff', padding: '8px 12px', borderRadius: 6, cursor: 'pointer'
-            }}>+ Add Transaction</button>
-          </div>
-
-          <div>
-            <h1>{projectState.Name || projectState.name || projectState.ProjectName || project.Name}</h1>
-            <p>{projectState.ProjectID ?? projectState.id ?? project.ProjectID ?? project.id} - {organization.name}</p>
-          </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className="summary-grid">
-          <SummaryCard
-            title="Project Budget"
-            value={budgetVal.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
-            icon={IndianRupee}
-            color="card-blue"
-            change={`${spentPercentage}% used`}
-            changeType="neutral"
-          />
-          <SummaryCard
-            title="Amount Spent"
-            value={spentVal.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
-            icon={Receipt}
-            color="card-red"
-            change={`${(100-parseFloat(spentPercentage)).toFixed(1)}% remaining`}
-            changeType="negative"
-          />
-          <SummaryCard
-            title="Current Profit/Loss"
-            value={Math.abs(profitVal).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
-            icon={profitVal >= 0 ? TrendingUp : TrendingDown}
-            color={profitVal >= 0 ? "card-green" : "card-red"}
-            change={`${profitMargin}% margin`}
-            changeType={profitVal >= 0 ? "positive" : "negative"}
-          />
-          <SummaryCard
-            title="Team Size"
-            value={project.team.toString()}
-            icon={Users}
-            color="card-purple"
-            change="Active members"
-            changeType="neutral"
-          />
-        </div>
-
-        {/* AR/AP Cards */}
+        {/* REMOVE TOP SUMMARY CARDS */}
+        {/* Summary Cards: AR, AP, Profit/Loss side by side in second row */}
         <div className="financial-details-grid" style={{ marginTop: 18 }}>
-          <div className="ar-card">
+          {/* AR Card */}
+          <div
+            className="ar-card"
+            style={{
+              background: 'white',
+              borderRadius: 20,
+              padding: '2rem',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
+              border: '1px solid #f3f4f6',
+              minWidth: 0,
+              cursor: 'pointer'
+            }}
+            onClick={() => setDashboardView('ar')}
+          >
             <h3>Accounts Receivable</h3>
-            <div className="ar-value">
+            <div style={{ fontSize: '2rem', fontWeight: 700, color: '#10b981', marginBottom: '1rem' }}>
               {arVal.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
             </div>
-            <p>Amount pending to be received from clients</p>
-            <div className="payment-status ar-status">
-              <div className="status-label">Payment Status</div>
-              <div className="status-value">Expected within 30 days</div>
+            <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
+              Amount pending to be received from clients
+            </p>
+            <div style={{ padding: '1rem', borderRadius: 12, background: 'rgba(16,185,129,0.1)' }}>
+              <div style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 4, color: '#047857' }}>
+                Payment Status
+              </div>
+              <div style={{ fontSize: '0.875rem', color: '#059669' }}>
+                Expected within 30 days
+              </div>
             </div>
           </div>
-          <div className="ap-card">
+
+          {/* AP Card */}
+          <div
+            className="ap-card"
+            style={{
+              background: 'white',
+              borderRadius: 20,
+              padding: '2rem',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
+              border: '1px solid #f3f4f6',
+              minWidth: 0,
+              cursor: 'pointer'
+            }}
+            onClick={() => setDashboardView('ap')}
+          >
             <h3>Accounts Payable</h3>
-            <div className="ap-value">
+            <div style={{ fontSize: '2rem', fontWeight: 700, color: '#ef4444', marginBottom: '1rem' }}>
               {apVal.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
             </div>
-            <p>Amount pending to be paid to vendors</p>
-            <div className="payment-status ap-status">
-              <div className="status-label">Payment Due</div>
-              <div className="status-value">Next 15 days</div>
+            <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
+              Amount pending to be paid to vendors
+            </p>
+            <div style={{ padding: '1rem', borderRadius: 12, background: 'rgba(239,68,68,0.1)' }}>
+              <div style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 4, color: '#dc2626' }}>
+                Payment Due
+              </div>
+              <div style={{ fontSize: '0.875rem', color: '#dc2626' }}>
+                Next 15 days
+              </div>
+            </div>
+          </div>
+
+          {/* Profit/Loss card */}
+          <div className="profitloss-card" style={{
+            background: 'white',
+            borderRadius: 20,
+            padding: '2rem',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
+            border: '1px solid #f3f4f6',
+            minWidth: 0
+          }}>
+            <h3>Current Profit/Loss</h3>
+            <div style={{ fontSize: '2rem', fontWeight: 700, color: profitVal >= 0 ? '#10b981' : '#ef4444', marginBottom: '1rem' }}>
+              {Math.abs(profitVal).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
+            </div>
+            <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>{profitVal >= 0 ? 'Profit' : 'Loss'} ({profitMargin}% margin)</p>
+            <div style={{ padding: '1rem', borderRadius: 12, background: profitVal >= 0 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)' }}>
+              <div style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 4, color: profitVal >= 0 ? '#047857' : '#dc2626' }}>
+                {profitVal >= 0 ? 'Positive Margin' : 'Negative Margin'}
+              </div>
+              <div style={{ fontSize: '0.875rem', color: profitVal >= 0 ? '#059669' : '#dc2626' }}>
+                {profitVal >= 0 ? 'Healthy project finances' : 'Review expenses'}
+              </div>
             </div>
           </div>
         </div>
@@ -365,7 +442,8 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
             </div>
             <div className="chart-description">
               {categoryTotals.length === 0 && <div style={{ color: '#666' }}>No spend records yet.</div>}
-              {categoryTotals.map((c) => (
+              {filteredCategoryTotals.length === 0 && <div style={{ color: '#666' }}>No records yet.</div>}
+              {filteredCategoryTotals.map((c) => (
                 <div key={c.category} className="chart-category-row" onClick={() => openCategory(c.category)}>
                   <div>
                     <div style={{ fontWeight: 600 }}>{c.category}</div>
@@ -401,14 +479,14 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
                 </div>
               </div>
               <div style={{ color: '#666', fontSize: 13, marginBottom: 8 }}>
-                {spendsByCategory[c.category] ? `${spendsByCategory[c.category].length} transactions` : '—'}
+                {c.txs ? `${c.txs.length} transactions` : '—'}
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
                 <div style={{ padding: '6px 8px', borderRadius: 6, background: 'rgba(59,130,246,0.08)', color: '#0f172a', fontSize: 12 }}>
                   View Details
                 </div>
                 <div style={{ padding: '6px 8px', borderRadius: 6, background: 'rgba(16,185,129,0.08)', color: '#0f172a', fontSize: 12 }}>
-                  {((c.total / project.budget) * 100).toFixed(1)}%
+                  {budgetVal ? ((c.total / budgetVal) * 100).toFixed(1) : '0.0'}%
                 </div>
               </div>
             </div>
@@ -438,13 +516,6 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
                 {project.status}
               </div>
             </div>
-            <div className="detail-item">
-              <div className="detail-header">
-                <Users size={20} />
-                <span>Team Members</span>
-              </div>
-              <div className="detail-value">{project.team} people</div>
-            </div>
           </div>
           {/* Budget Progress Bar */}
           <div className="budget-progress">
@@ -469,7 +540,11 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         categoryName={selectedCategory}
-        spends={(selectedCategory && spendsByCategory[selectedCategory]) ? spendsByCategory[selectedCategory] : []}
+        spends={
+          selectedCategory && filteredSpendsByCategory[selectedCategory]
+            ? filteredSpendsByCategory[selectedCategory]
+            : []
+        }
       />
 
       {/* Add Transaction Modal */}
@@ -520,6 +595,11 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
             </div>
           </form>
         </div>
+      )}
+      {dashboardView !== 'all' && (
+        <button onClick={() => setDashboardView('all')} style={{ margin: '12px 0' }}>
+          Show All
+        </button>
       )}
     </div>
   );

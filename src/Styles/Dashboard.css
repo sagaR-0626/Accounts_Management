@@ -584,18 +584,20 @@ html, body {
 /* Financial Details Cards */
 .financial-details-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(3, 1fr); /* Always 3 columns */
+  gap: 1rem;
   margin-bottom: 2rem;
 }
 
 .ar-card,
-.ap-card {
+.ap-card,
+.profitloss-card {
   background: white;
   border-radius: 20px;
-  padding: 2rem;
+  padding: 1.25rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
   border: 1px solid #f3f4f6;
+  min-width: 0;
 }
 
 .ar-card h3,
@@ -606,24 +608,18 @@ html, body {
   margin-bottom: 1rem;
 }
 
-.ar-value {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #10b981;
-  margin-bottom: 1rem;
-}
-
+.ar-value,
 .ap-value {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #ef4444;
-  margin-bottom: 1rem;
+  font-size: 1.5rem;
 }
 
-.ar-card p,
-.ap-card p {
-  color: #6b7280;
-  margin-bottom: 1.5rem;
+.profitloss-card h3 {
+  font-size: 1.1rem;
+}
+
+.profitloss-card {
+  font-size: 1rem;
+  padding: 1.25rem;
 }
 
 .payment-status {

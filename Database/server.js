@@ -12,6 +12,43 @@ app.use(cors());
 app.use(express.json());
 
 // 1) Admin connection (no database specified)
+
+// Bulk import transactions and audit log
+app.post('/import-transactions', async (req, res) => {
+  const { rows, uploaderEmail, fileName, organizationId } = req.body;
+  if (!Array.isArray(rows)) return res.status(400).json({ error: 'Rows array required' });
+
+  // Save audit log with organizationId
+  await pool.query(
+    `INSERT INTO AuditUploads (UploaderEmail, FileName, RowCount, OrganizationID) VALUES (?, ?, ?, ?)`,
+    [uploaderEmail || 'unknown', fileName || '', rows.length, organizationId || null]
+  );
+
+  // Save transactions with organizationId
+  let inserted = 0;
+  for (const row of rows) {
+    try {
+      await pool.query(
+        `INSERT INTO Transactions (ProjectID, OrganizationID, TxnDate, Category, ExpenseType, Item, Note, Amount)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          row.ProjectID || null,
+          organizationId || null,
+          row.Date || row.TxnDate || new Date().toISOString().slice(0,10),
+          row.Category || 'Uncategorized',
+          row.ExpenseType || 'Expense',
+          row.Item || null,
+          row.Note || row.Description || null,
+          Number(row.Amount || 0)
+        ]
+      );
+      inserted++;
+    } catch (err) {
+      // skip failed row
+    }
+  }
+  res.json({ message: `Imported ${inserted} transactions.` });
+});
 const adminConn = mysql.createConnection({
   host: process.env.MYSQL_HOST,
   user: process.env.MYSQL_USER,

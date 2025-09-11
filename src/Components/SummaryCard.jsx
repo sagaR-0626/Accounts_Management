@@ -10,7 +10,9 @@ const SummaryCard = ({ title, value, icon: Icon, color, change, changeType }) =>
         {change}
       </div>
     </div>
-    <div className="card-value">{value}</div>
+    <div className="card-value">
+      {value.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
+    </div>
     <div className="card-title">{title}</div>
   </div>
 );
