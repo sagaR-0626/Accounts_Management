@@ -97,7 +97,7 @@ const Header = ({ onUpload, hasData, onLogout, isLoggedIn }) => {
                 }}
                 aria-label="Logout"
               >
-                Logout
+                Signout
               </button>
             )}
           </div>
