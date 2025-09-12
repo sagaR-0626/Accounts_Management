@@ -9,6 +9,8 @@ import '../Styles/Dashboard.css'; // Import the CSS file
 import * as XLSX from 'xlsx'; // Add at top
 import { Bar, Pie } from 'react-chartjs-2';
 import { Chart, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
+import Papa from 'papaparse';
+
 Chart.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
  
 const API_BASE = 'http://localhost:3001'; // adjust if your server runs elsewhere
@@ -36,6 +38,7 @@ const OrganizationDashboard = ({ isLoggedIn, onLogout }) => {
   const [totals, setTotals] = useState({ budget:0, spent:0, profit:0, ar:0, ap:0, team:0 });
   const [showNewProjectForm, setShowNewProjectForm] = useState(false);
   const [uploadedData, setUploadedData] = useState([]);
+  const [projectsFromFile, setProjectsFromFile] = useState([]);
   const [uploadError, setUploadError] = useState('');
   const [uploadFileName, setUploadFileName] = useState('');
   const [showAmountPopup, setShowAmountPopup] = useState(false);
@@ -216,13 +219,22 @@ const OrganizationDashboard = ({ isLoggedIn, onLogout }) => {
   };
  
   const getFilteredProjects = () => {
+    // If projectsFromFile is present, use it for projects
+    if (projectsFromFile && projectsFromFile.length > 0) {
+      if (selectedDept === 'all') {
+        return projectsFromFile;
+      } else if (selectedDept === 'infra') {
+        return projectsFromFile.filter(p => (p.departmentName || '').toLowerCase().includes('infra'));
+      } else if (selectedDept === 'designstudioz') {
+        return projectsFromFile.filter(p => (p.departmentName || '').toLowerCase().includes('design'));
+      }
+      return projectsFromFile;
+    }
+    // Otherwise, use DB data
     if (!selectedOrg) return [];
- 
     if (selectedOrg.id === 1 && selectedOrg.projects) {
-      // legacy behavior: org 1 is "software" with simple projects list
       return selectedOrg.projects;
     }
- 
     if (selectedDept === 'all') {
       return rawProjects;
     } else if (selectedDept === 'infra') {
@@ -409,25 +421,32 @@ const OrganizationDashboard = ({ isLoggedIn, onLogout }) => {
     );
   };
  
-  const handleFileUpload = (e) => {
-    setUploadError('');
+  const handleFileUpload = async (e) => {
     const file = e.target.files[0];
-    if (!file) return;
- 
-    setUploadFileName(file.name);
- 
+    if (!file || !selectedOrg?.id) return;
+
     const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const data = evt.target.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-        setUploadedData(json);
-      } catch (err) {
-        setUploadError('Failed to parse file. Please upload a valid Excel or CSV.');
-      }
+    reader.onload = async (evt) => {
+      const data = evt.target.result;
+      const workbook = XLSX.read(data, { type: 'binary' });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+      // POST to backend to save in DB
+      await fetch('http://localhost:3001/import-transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rows: json,
+          organizationId: selectedOrg.id,
+          fileName: file.name,
+          uploaderEmail: userEmail // if available
+        })
+      });
+
+      // After upload, reload org/projects from DB
+      await handleOrgSelect(selectedOrg.id);
     };
     reader.readAsBinaryString(file);
   };
@@ -467,6 +486,10 @@ const OrganizationDashboard = ({ isLoggedIn, onLogout }) => {
     const result = await res.json();
     alert(result.message || 'Import complete');
     setShowUploadedPreview(true); // Show preview after saving
+
+    setUploadedData([]);
+    setProjectsFromFile([]);
+    await handleOrgSelect(selectedOrg.id); // Reload from DB
   };
  
   // Move this helper function up, before you use it!
@@ -646,11 +669,11 @@ const getInitialAmountFromExcel = (data) => {
             selectedDept={selectedDept}
             onDeptChange={setSelectedDept}
             onProjectSelect={handleProjectSelect}
-            onBack={handleBack}
-            projects={getFilteredProjects()}
-            totals={Object.keys(totals).length ? totals : totals}
             onAddProject={setShowNewProjectForm}
-            onFileUpload={handleFileUpload}
+            onFileUpload={handleFileUpload} // <-- Pass handler here
+            onBack={handleBack}
+            projects={projectsFromFile.length > 0 ? projectsFromFile : getFilteredProjects()}
+            totals={calculateTotals(projectsFromFile.length > 0 ? projectsFromFile : getFilteredProjects())}
           />
           {showNewProjectForm && selectedOrg && (
             <NewProjectModal

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-// Header import removed
-import { ArrowLeft, Filter, TrendingUp, TrendingDown, IndianRupee, Users, Plus } from 'lucide-react';
+import { TrendingUp, TrendingDown, IndianRupee } from 'lucide-react';
 import SummaryCard from './SummaryCard';
 import ProjectCard from './ProjectCard';
 
@@ -9,217 +8,235 @@ const CompanyDashboard = ({
   selectedDept,
   onDeptChange,
   onProjectSelect,
-  onBack,
-  projects,
-  totals,
-  onAddProject, // <-- new prop (function to toggle new-project UI)
-  onFileUpload // <-- add this prop for file upload
+  onAddProject,
+  onFileUpload,
+  onBack,           // <-- Add this line
+  projects = [],
+  totals = { ar: 0, ap: 0 },
 }) => {
-  // Add dashboardView state
-  const [dashboardView, setDashboardView] = useState('all'); // 'all', 'ar', 'ap'
+  // Tab state: 'all', 'ar', 'ap'
+  const [dashboardView, setDashboardView] = useState('all');
 
-  // Filter projects based on dashboardView
-  const filteredProjects = dashboardView === 'all'
-    ? projects
-    : projects.filter(p => {
-        if (dashboardView === 'ar') {
-          return (p.ar ?? p.AR ?? 0) > 0;
-        } else {
-          return (p.ap ?? p.AP ?? 0) > 0;
-        }
-      });
+  // Filter projects by department and AR/AP tab
+  const visibleProjects = projects.filter((project) => {
+    if (selectedDept && selectedDept !== 'all' && project.department !== selectedDept) return false;
+    if (dashboardView === 'ar') return project.ar > 0;
+    if (dashboardView === 'ap') return project.ap > 0;
+    return true;
+  });
+
+  // Filter transactions for AR/AP tab (company level)
+  const allTxs = projects.flatMap((p) => p.transactions || []);
+  const filteredTxs = allTxs.filter((tx) =>
+    dashboardView === 'ar'
+      ? (tx.ExpenseType || tx.expenseType) === 'Income'
+      : dashboardView === 'ap'
+      ? (tx.ExpenseType || tx.expenseType) === 'Expense'
+      : true
+  );
+
+  // Category breakdown for AR/AP tab
+  const categoryTotals = [];
+  if (dashboardView !== 'all') {
+    const map = {};
+    filteredTxs.forEach((tx) => {
+      const cat = tx.Category || tx.category || 'Other';
+      map[cat] = (map[cat] || 0) + Number(tx.Amount || tx.amount || 0);
+    });
+    for (const cat in map) {
+      categoryTotals.push({ category: cat, total: map[cat] });
+    }
+  }
+
+  // Card highlight style
+  const getCardStyle = (type) =>
+    dashboardView === type
+      ? { boxShadow: '0 0 0 3px #bae6fd', borderRadius: 12 }
+      : {};
 
   return (
     <div className="dashboard-main">
       <div className="dashboard-container">
-        {/* Header (moved to top-level Dashboard) */}
+        {/* Header */}
         <div className="dashboard-header">
           <div className="header-left">
-            <button onClick={onBack} className="back-btn">
-              <ArrowLeft size={20} />
-              Back
+            <button
+              className="back-btn"
+              onClick={typeof onBack === 'function' ? onBack : () => window.history.back()}
+            >
+              ← Back
             </button>
-            <div>
-              <h1
-                className={
-                  organization && organization.name === 'Collabridge Solutions'
-                    ? 'company-name-collabridge'
-                    : organization && organization.name === 'LA tierra'
-                    ? 'company-name-la-tierra'
-                    : ''
-                }
-              >
-                {organization ? organization.name : ''}
-              </h1>
-              <p>{organization ? organization.type : ''}</p>
-            </div>
+            <h1>
+              {organization?.name || 'Organization'}
+            </h1>
           </div>
-
-          <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-  
-  {/* Add Transaction button */}
-  <button
-    onClick={() => onAddProject && onAddProject()}
-    className="add-transaction-btn"
-    style={{
-      border: 'none',
-      background: '#2563eb',
-      color: '#fff',
-      padding: '8px 16px',
-      borderRadius: 8,
-      fontWeight: 500,
-      fontSize: 15,
-      boxShadow: '0 2px 8px rgba(16,185,129,0.08)',
-      transition: 'background 0.2s',
-      cursor: 'pointer'
-    }}
-  >
-    <Plus size={18} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-    Add Project
-  </button>
-
-  {/* Upload File Button */}
-  <label
-    htmlFor="upload-file-input"
-    className="add-transaction-btn"
-    style={{
-      border: 'none',
-      background: '#2563eb',
-      color: '#fff',
-      padding: '8px 16px',
-      borderRadius: 8,
-      fontWeight: 500,
-      fontSize: 15,
-      boxShadow: '0 2px 8px rgba(16,185,129,0.08)',
-      transition: 'background 0.2s',
-      cursor: 'pointer',
-      marginLeft: 8
-    }}
-  >
-    <Plus size={18} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-    Upload File
-    <input
-      id="upload-file-input"
-      type="file"
-      accept=".xlsx,.csv"
-      style={{ display: 'none' }}
-      onChange={typeof onFileUpload === 'function' ? onFileUpload : undefined}
-    />
-  </label>
-
-  {/* Department Filter for Construction */}
-  {organization && organization.id === 2 && (
-    <div className="filter-section" style={{ marginLeft: 16 }}>
-      <Filter size={20} />
-      <select
-        value={selectedDept}
-        onChange={(e) => onDeptChange(e.target.value)}
-        className="dept-filter"
-        style={{
-          marginLeft: 6,
-          padding: '6px 10px',
-          borderRadius: 6,
-          border: '1px solid #e5e7eb',
-          fontSize: 14
-        }}
-      >
-        <option value="all">All Departments</option>
-        <option value="infra">Infra</option>
-        <option value="designstudioz">DesignStudioz</option>
-      </select>
-    </div>
-  )}
-</div>
+          <div className="header-actions" style={{ display: 'flex', gap: 12 }}>
+            <button
+              onClick={() => typeof onAddProject === 'function' && onAddProject(true)}
+              style={{
+                border: 'none',
+                background: '#2563eb',
+                color: '#fff',
+                padding: '8px 16px',
+                borderRadius: 6,
+                cursor: 'pointer',
+                fontWeight: 500,
+                fontSize: 16
+              }}
+            >
+              + Add Project
+            </button>
+            <label htmlFor="company-upload-file">
+              <input
+                id="company-upload-file"
+                type="file"
+                accept=".csv,.xlsx"
+                style={{ display: 'none' }}
+                onChange={onFileUpload}
+              />
+              <button
+                type="button"
+                style={{
+                  border: 'none',
+                  background: '#2563eb',
+                  color: '#fff',
+                  padding: '8px 16px',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                  fontSize: 16
+                }}
+                onClick={() => document.getElementById('company-upload-file').click()}
+              >
+                📁 Upload File
+              </button>
+            </label>
+          </div>
         </div>
 
-        {/* Summary Cards */}
+        {/* Summary Cards (tab selector) */}
         <div className="summary-grid">
-          {/* REMOVE THESE CARDS */}
-          {/* 
-          <SummaryCard
-            title="Project Budget"
-            ...
-          />
-          <SummaryCard
-            title="Amount Spent"
-            ...
-          />
-          <SummaryCard
-            title="Team Size"
-            ...
-          />
-          */}
-          {/* KEEP ONLY THE AR/AP/Profit-Loss CARDS */}
           <SummaryCard
             title="Accounts Receivable"
-            value={totals.ar.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
+            value={totals.ar}
             icon={TrendingUp}
             color={dashboardView === 'ar' ? "card-green selected" : "card-green"}
             change="+15%"
             changeType="positive"
             onClick={() => setDashboardView('ar')}
-            style={{ cursor: 'pointer' }}
+            style={getCardStyle('ar')}
           />
           <SummaryCard
             title="Accounts Payable"
-            value={totals.ap.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
+            value={totals.ap}
             icon={TrendingDown}
             color={dashboardView === 'ap' ? "card-orange selected" : "card-orange"}
             change="-5%"
             changeType="negative"
             onClick={() => setDashboardView('ap')}
-            style={{ cursor: 'pointer' }}
+            style={getCardStyle('ap')}
           />
           <SummaryCard
             title="Profit / Loss"
-            value={Math.abs(totals.ar - totals.ap).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
+            value={Math.abs(totals.ar - totals.ap)}
             icon={IndianRupee}
             color={totals.ar - totals.ap >= 0 ? "card-green" : "card-red"}
             change={totals.ar - totals.ap >= 0 ? "Profit" : "Loss"}
             changeType={totals.ar - totals.ap >= 0 ? "positive" : "negative"}
           />
+          {dashboardView !== 'all' && (
+            <button
+              style={{
+                marginLeft: 12,
+                padding: '8px 18px',
+                borderRadius: 8,
+                border: 'none',
+                background: '#e5e7eb',
+                color: '#2563eb',
+                fontWeight: 500,
+                cursor: 'pointer'
+              }}
+              onClick={() => setDashboardView('all')}
+            >
+              Show All
+            </button>
+          )}
         </div>
+
+        {/* AR/AP Tabbed View for Company Level */}
+        {dashboardView !== 'all' && (
+          <div style={{ margin: '18px 0' }}>
+            <div className="company-tab-dashboard" style={{ background: '#fff', borderRadius: 16, boxShadow: '0 4px 16px rgba(0,0,0,0.04)', padding: 24 }}>
+              <h2 style={{ marginBottom: 18 }}>
+                {dashboardView === 'ar' ? 'Accounts Receivable' : 'Accounts Payable'} — Company Level
+              </h2>
+              <div style={{ marginBottom: 18 }}>
+                <strong>Total {dashboardView === 'ar' ? 'Receipts' : 'Expenses'}:</strong>{' '}
+                {filteredTxs.reduce((sum, tx) => sum + Number(tx.Amount || tx.amount || 0), 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
+              </div>
+              <div style={{ marginBottom: 18 }}>
+                <h4>Category Breakdown</h4>
+                {categoryTotals.length === 0 && <div style={{ color: '#666' }}>No records yet.</div>}
+                {categoryTotals.map(c => (
+                  <div key={c.category} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
+                    <div style={{ fontWeight: 600 }}>{c.category}</div>
+                    <div style={{ fontWeight: 700 }}>
+                      {c.total.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* You can add charts here similar to ProjectDashboard if needed */}
+            </div>
+          </div>
+        )}
+
+        {/* Department Filter */}
+        <select
+          value={selectedDept}
+          onChange={(e) => onDeptChange(e.target.value)}
+          className="dept-filter"
+          style={{
+            marginLeft: 6,
+            padding: '6px 10px',
+            borderRadius: 6,
+            border: '1px solid #e5e7eb',
+            fontSize: 14
+          }}
+        >
+          <option value="all">All Departments</option>
+          <option value="infra">Infra</option>
+          <option value="designstudioz">DesignStudioz</option>
+        </select>
 
         {/* Projects Section */}
         <div className="projects-section">
           <div className="section-header">
             <h2>
-              {selectedDept === 'all' ? 'All Projects' : 
-                selectedDept === 'infra' ? 'Infrastructure Projects' :
-                selectedDept === 'designstudioz' ? 'Design Studio Projects' : 'Projects'}
+              {dashboardView === 'ar'
+                ? 'Accounts Receivable Projects'
+                : dashboardView === 'ap'
+                ? 'Accounts Payable Projects'
+                : selectedDept === 'all'
+                ? 'All Projects'
+                : selectedDept === 'infra'
+                ? 'Infrastructure Projects'
+                : selectedDept === 'designstudioz'
+                ? 'Design Studio Projects'
+                : 'Projects'}
             </h2>
             <div className="project-count">
-              {filteredProjects.length} active projects
+              {visibleProjects.length} active projects
             </div>
           </div>
           <div className="projects-grid">
-            {filteredProjects.map((project) => (
-              <ProjectCard 
-                key={project.id} 
-                project={project} 
+            {visibleProjects.map((project) => (
+              <ProjectCard
+                key={project.id}
+                project={project}
                 onSelect={onProjectSelect}
               />
             ))}
-          </div>
-        </div>
-
-        {/* Financial Overview */}
-        <div className="financial-grid">
-          <div className="financial-card">
-            <h3>Profit/Loss Overview</h3>
-            <div className="financial-list">
-              {filteredProjects.map((project) => (
-                <div key={project.id} className="financial-item">
-                  <div>
-                    <div className="project-id">{project.id}</div>
-                    <div className="project-name">{project.name}</div>
-                  </div>
-                  <div className={`profit-value ${project.profit >= 0 ? 'positive' : 'negative'}`}>
-                    {Math.abs(project.profit).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </div>

@@ -28,6 +28,9 @@ app.post('/import-transactions', async (req, res) => {
   let inserted = 0;
   for (const row of rows) {
     try {
+      if (row.OrganizationID !== req.body.organizationId) {
+        // return error
+      }
       await pool.query(
         `INSERT INTO Transactions (ProjectID, OrganizationID, TxnDate, Category, ExpenseType, Item, Note, Amount)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,

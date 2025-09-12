@@ -1,7 +1,7 @@
 import React from 'react';
 
-const SummaryCard = ({ title, value, icon: Icon, color, change, changeType }) => (
-  <div className="summary-card">
+const SummaryCard = ({ title, value, icon: Icon, color, change, changeType, onClick, style }) => (
+  <div className="summary-card" onClick={onClick} style={style}>
     <div className="card-header">
       <div className={`card-icon ${color}`}>
         <Icon size={24} />

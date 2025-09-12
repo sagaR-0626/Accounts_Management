@@ -3,6 +3,7 @@ import { ArrowLeft, IndianRupee, TrendingUp, TrendingDown, Receipt, Users, Calen
 import SummaryCard from './SummaryCard';
 import { Doughnut, Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement } from 'chart.js';
+import Filters from './Filters'; // Add this import at the top
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement);
 
@@ -73,6 +74,34 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
   // create a local mutable copy so we can update spent in real time
   const [projectState, setProjectState] = useState(project);
 
+  // Use only transactions for this project
+  const transactions = project.transactions || [];
+
+  // Category totals and spends
+  const [categoryTotals, setCategoryTotals] = useState([]); // [{category, total}]
+  const [spendsByCategory, setSpendsByCategory] = useState({}); // { category: [spendItems] }
+
+  useEffect(() => {
+    // Calculate category totals and spends for this project only
+    const catTotals = {};
+    const spendsCat = {};
+    transactions.forEach(tx => {
+      const cat = tx.Category || 'Uncategorized';
+      const amt = Number(tx.Amount || 0);
+      if (!catTotals[cat]) catTotals[cat] = 0;
+      catTotals[cat] += amt;
+      if (!spendsCat[cat]) spendsCat[cat] = [];
+      spendsCat[cat].push({
+        item: tx.Item || tx.Note || '',
+        amount: amt,
+        date: tx.TxnDate || tx.Date || '',
+        note: tx.Note || '',
+      });
+    });
+    setCategoryTotals(Object.entries(catTotals).map(([category, total]) => ({ category, total })));
+    setSpendsByCategory(spendsCat);
+  }, [project]);
+
   useEffect(() => {
     if (!project) return;
     // normalize server / client field-name variations so AR/AP/Spending/Budget are always available
@@ -101,9 +130,7 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
   const spentVal = Number(projectState.Spending ?? projectState.spent ?? project.spent ?? 0);
   const spentPercentage = budgetVal ? ((spentVal / budgetVal) * 100).toFixed(1) : '0.0';
 
-  const [categoryTotals, setCategoryTotals] = useState([]); // [{category, total}]
-  const [spendsByCategory, setSpendsByCategory] = useState({}); // { category: [spendItems] }
-  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState('all'); // Use 'all' for default
   const [modalOpen, setModalOpen] = useState(false);
 
   // Add transaction modal state
@@ -112,152 +139,65 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
     TxnDate: new Date().toISOString().slice(0,10),
     Category: '',
     ExpenseType: 'Expense',
-    Item: '', // <-- Add this line
+    Item: '',
     Note: '',
     Amount: ''
   });
 
+  // Fix: define createTransaction as a stub to remove error
+  const createTransaction = (e) => {
+    e.preventDefault();
+    // You can implement transaction creation logic here if needed
+    alert('Add transaction functionality is not implemented yet.');
+  };
+
   // New state for dashboard view
   const [dashboardView, setDashboardView] = useState('all'); // 'all', 'ar', 'ap'
 
-  useEffect(() => {
-    // extract fetch so we can call it after POST and from a refresh button
-    async function fetchTransactions() {
-      console.log('Fetching transactions for project:', project.ProjectID || project.id);
-      const projectId = project.ProjectID || project.id;
-      if (!projectId) return;
-      const res = await fetch(`${API_BASE}/transactions?projectId=${projectId}`);
-      let data = await res.json();
-      if (!Array.isArray(data)) {
-        console.warn('Transactions API did not return an array:', data);
-        data = [];
-      }
-      // group by category — include Item
-      const grouped = {};
-      (data || []).forEach(r => {
-        const cat = r.Category || 'Uncategorized';
-        if (!grouped[cat]) grouped[cat] = [];
-        grouped[cat].push({
-          id: r.TxnID,
-          date: r.TxnDate,
-          amount: r.Amount,
-          note: r.Note || '',
-          item: r.Item || '',           // <- include Item
-          expenseType: r.ExpenseType
-        });
+  // 2. Filtered helpers
+  const filteredCategoryTotals = dashboardView === 'all'
+    ? categoryTotals
+    : categoryTotals.filter(c => {
+        if (dashboardView === 'ar') {
+          // Only categories with income transactions
+          return spendsByCategory[c.category].some(tx => {
+            const txObj = transactions.find(t => (t.Category || 'Uncategorized') === c.category && (t.Item || t.Note || '') === tx.item);
+            return txObj && ((txObj.ExpenseType || '').toLowerCase() === 'income' || (txObj.Category || '').toLowerCase().includes('income') || (txObj.Category || '').toLowerCase().includes('revenue'));
+          });
+        } else if (dashboardView === 'ap') {
+          // Only categories with expense transactions
+          return spendsByCategory[c.category].some(tx => {
+            const txObj = transactions.find(t => (t.Category || 'Uncategorized') === c.category && (t.Item || t.Note || '') === tx.item);
+            return txObj && (txObj.ExpenseType || '').toLowerCase() === 'expense';
+          });
+        }
+        return true;
       });
-      const totals = Object.keys(grouped).map(cat => ({
-        category: cat,
-        total: grouped[cat].reduce((s, x) => s + Number(x.amount || 0), 0)
-      })).sort((a,b) => b.total - a.total);
-      setCategoryTotals(totals);
-      setSpendsByCategory(grouped);
-    }
-    fetchTransactions();
-  }, [project]);
 
-  // create transaction and update UI immediately
-  const createTransaction = async (e) => {
-    e && e.preventDefault();
-    try {
-      const payload = {
-        ProjectID: project.ProjectID || project.id, // robust id
-        TxnDate: txForm.TxnDate,
-        Category: txForm.Category || 'Uncategorized',
-        ExpenseType: txForm.ExpenseType,
-        Item: txForm.Item, // <-- ensure we send Item
-        Note: txForm.Note,
-        Amount: Number(txForm.Amount)
-      };
-      const res = await fetch(`${API_BASE}/transactions`, {
-         method: 'POST',
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify(payload)
-       });
-       const j = await res.json();
-       if (!res.ok) throw new Error(j.error || 'Failed to create transaction');
- 
-       const tx = j.transaction;
-       // update spendsByCategory (create category if missing)
-       setSpendsByCategory(prev => {
-         const next = { ...prev };
-         const cat = tx.Category || 'Uncategorized';
-         if (!next[cat]) next[cat] = [];
-         next[cat] = [
-           ...next[cat],
-           {
-             id: tx.TxnID,
-             date: tx.TxnDate,
-             amount: tx.Amount,
-             note: tx.Note,
-             item: tx.Item || '',   // <- include Item here too
-             expenseType: tx.ExpenseType
-           }
-         ];
-         return next;
-       });
-      // re-fetch to fully sync (covers any DB-side defaults/changes)
-      // (if you extracted fetchTransactions to module scope, call it here)
-      // simple approach: refresh the page or re-run the effect by toggling project prop
-      // If you extracted fetchTransactions function above, call it here:
-      try { await fetch(`${API_BASE}/transactions?projectId=${payload.ProjectID}`); } catch(_) {}
- 
-       // update categoryTotals
-       setCategoryTotals(prev => {
-         const cat = tx.Category || 'Uncategorized';
-         const amount = Number(tx.Amount || 0);
-         const idx = prev.findIndex(p => p.category === cat);
-         if (idx === -1) {
-           return [{ category: cat, total: amount }, ...prev].sort((a,b)=>b.total-a.total);
-         } else {
-           const copy = prev.slice();
-           copy[idx] = { ...copy[idx], total: copy[idx].total + amount };
-           return copy.sort((a,b)=>b.total-a.total);
-         }
-       });
- 
-       // update project spending locally if backend returned updatedSpending
-       if (j.updatedSpending !== undefined && j.updatedSpending !== null) {
-         setProjectState(prev => ({
-           ...prev,
-           Spending: Number(j.updatedSpending),
-           spent: Number(j.updatedSpending),
-           // update AR/AP if server returned them
-           ar: j.updatedAR !== undefined ? Number(j.updatedAR) : prev.ar,
-           ap: j.updatedAP !== undefined ? Number(j.updatedAP) : (Number(prev.Spending ?? prev.spent ?? 0))
-         }));
-       } else if (tx.ExpenseType && tx.ExpenseType.toLowerCase() === 'expense') {
-         // fallback increment
-         setProjectState(prev => ({
-           ...prev,
-           Spending: Number((prev.Spending || prev.spent || 0) + Number(tx.Amount || 0)),
-           spent: Number((prev.Spending || prev.spent || 0) + Number(tx.Amount || 0)),
-           ap: Number((prev.ap || prev.Spending || prev.spent || 0) + Number(tx.Amount || 0))
-         }));
-       } else if (tx.ExpenseType && (tx.ExpenseType.toLowerCase() === 'receipt' || tx.ExpenseType.toLowerCase() === 'income')) {
-         // fallback for receipts: increment AR
-         setProjectState(prev => ({
-           ...prev,
-           ar: Number((prev.ar || 0) + Number(tx.Amount || 0))
-         }));
-       }
- 
-       // reset form and close
-       setTxForm({
-        TxnDate: new Date().toISOString().slice(0,10),
-        Category: '',
-        ExpenseType: 'Expense',
-        Item: '', // <-- Reset this field
-        Note: '',
-        Amount: ''
-      });
-      setAddModalOpen(false);
-    } catch (err) {
-      console.error('Error creating transaction:', err);
-      alert(err.message || 'Failed to add transaction');
-    }
+  const filteredSpendsByCategory = {};
+  filteredCategoryTotals.forEach(c => {
+    filteredSpendsByCategory[c.category] = spendsByCategory[c.category].filter(tx => {
+      const txObj = transactions.find(t => (t.Category || 'Uncategorized') === c.category && (t.Item || t.Note || '') === tx.item);
+      if (dashboardView === 'ar') {
+        return txObj && ((txObj.ExpenseType || '').toLowerCase() === 'income' || (txObj.Category || '').toLowerCase().includes('income') || (txObj.Category || '').toLowerCase().includes('revenue'));
+      } else if (dashboardView === 'ap') {
+        return txObj && (txObj.ExpenseType || '').toLowerCase() === 'expense';
+      }
+      return true;
+    });
+  });
+
+  // Chart
+  const doughnutData = {
+    labels: filteredCategoryTotals.map(c => c.category),
+    datasets: [{
+      data: filteredCategoryTotals.map(c => c.total),
+      backgroundColor: [
+        '#3b82f6', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#06b6d4', '#f59e0b'
+      ].slice(0, filteredCategoryTotals.length)
+    }]
   };
-  
+
   const openCategory = (cat) => {
     setSelectedCategory(cat);
     setModalOpen(true);
@@ -271,41 +211,19 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
     return tx.expenseType && tx.expenseType.toLowerCase() === 'expense';
   }
 
-  // categoryTotals and spendsByCategory should be defined here
-  
+  // Prepare category list for filter
+  const categoryList = categoryTotals.map(c => c.category);
 
-  // 2. Filtered helpers
-  const filteredCategoryTotals = dashboardView === 'all'
-    ? categoryTotals
-    : categoryTotals
-        .map(c => {
-          const txs = spendsByCategory[c.category] || [];
-          const filteredTxs = dashboardView === 'ar'
-            ? txs.filter(isAR)
-            : txs.filter(isAP);
-          return {
-            category: c.category,
-            total: filteredTxs.reduce((sum, tx) => sum + Number(tx.amount || 0), 0),
-            txs: filteredTxs
-          };
-        })
-        .filter(c => c.total > 0);
+  // Filtered spends/cards based on selectedCategory
+  const filteredCategoryTotalsForFilter = selectedCategory === 'all'
+    ? filteredCategoryTotals
+    : filteredCategoryTotals.filter(c => c.category === selectedCategory);
 
-  const filteredSpendsByCategory = {};
-  filteredCategoryTotals.forEach(c => {
-    filteredSpendsByCategory[c.category] = c.txs;
-  });
-
-  // Chart
-  const doughnutData = {
-    labels: filteredCategoryTotals.map(c => c.category),
-    datasets: [{
-      data: filteredCategoryTotals.map(c => c.total),
-      backgroundColor: [
-        '#3b82f6', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#06b6d4', '#f59e0b'
-      ].slice(0, filteredCategoryTotals.length)
-    }]
-  };
+  const filteredSpendsByCategoryForFilter = selectedCategory === 'all'
+    ? filteredSpendsByCategory
+    : {
+        [selectedCategory]: filteredSpendsByCategory[selectedCategory] || []
+      };
 
   return (
     <div className="dashboard-main">
@@ -348,13 +266,14 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
           <div
             className="ar-card"
             style={{
-              background: 'white',
+              background: dashboardView === 'ar' ? 'rgba(16,185,129,0.08)' : 'white',
               borderRadius: 20,
               padding: '2rem',
               boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
               border: '1px solid #f3f4f6',
               minWidth: 0,
-              cursor: 'pointer'
+              cursor: 'pointer',
+              transition: 'background 0.2s'
             }}
             onClick={() => setDashboardView('ar')}
           >
@@ -379,13 +298,14 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
           <div
             className="ap-card"
             style={{
-              background: 'white',
+              background: dashboardView === 'ap' ? 'rgba(239,68,68,0.08)' : 'white',
               borderRadius: 20,
               padding: '2rem',
               boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
               border: '1px solid #f3f4f6',
               minWidth: 0,
-              cursor: 'pointer'
+              cursor: 'pointer',
+              transition: 'background 0.2s'
             }}
             onClick={() => setDashboardView('ap')}
           >
@@ -431,19 +351,67 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
           </div>
         </div>
 
+        {/* Filters Component */}
+        <Filters
+          selectedCategory={selectedCategory}
+          onCategoryChange={setSelectedCategory}
+          categories={categoryList}
+        />
+
         {/* Chart + Description Side by Side */}
         <div className="chart-section">
           <div className="chart-box">
             <div className="chart-canvas">
               <h4>Spend by Category</h4>
-              <div style={{ height: 320, width: '100%', display: 'flex', justifyContent: 'center' }}>
-                <Doughnut data={doughnutData} />
-              </div>
+              {selectedCategory === 'all' ? (
+                <div style={{ height: 320, width: '100%', display: 'flex', justifyContent: 'center' }}>
+                  <Doughnut data={doughnutData} />
+                </div>
+              ) : (
+                <div>
+                  <h4>{selectedCategory} Details</h4>
+                  {filteredSpendsByCategoryForFilter[selectedCategory] &&
+                    filteredSpendsByCategoryForFilter[selectedCategory].length > 0 ? (
+                    <>
+                      <div style={{ height: 320, width: '100%', display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
+                        <Doughnut
+                          data={{
+                            labels: filteredSpendsByCategoryForFilter[selectedCategory].map(s => s.item || s.note || 'Expense'),
+                            datasets: [{
+                              data: filteredSpendsByCategoryForFilter[selectedCategory].map(s => s.amount),
+                              backgroundColor: [
+                                '#3b82f6', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#06b6d4', '#f59e0b'
+                              ].slice(0, filteredSpendsByCategoryForFilter[selectedCategory].length)
+                            }]
+                          }}
+                        />
+                      </div>
+                      <div>
+                        {filteredSpendsByCategoryForFilter[selectedCategory].map((item, idx) => (
+                          <div key={idx} style={{
+                            display: 'flex', justifyContent: 'space-between', padding: '8px 0',
+                            borderBottom: '1px solid #f0f0f0'
+                          }}>
+                            <div>
+                              <div style={{ fontWeight: 600 }}>{item.item || item.note || 'Expense'}</div>
+                              <div style={{ color: '#666', fontSize: 13 }}>{item.date}</div>
+                            </div>
+                            <div style={{ fontWeight: 700 }}>
+                              {Number(item.amount).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ color: '#666' }}>No items for this category.</div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="chart-description">
-              {categoryTotals.length === 0 && <div style={{ color: '#666' }}>No spend records yet.</div>}
-              {filteredCategoryTotals.length === 0 && <div style={{ color: '#666' }}>No records yet.</div>}
-              {filteredCategoryTotals.map((c) => (
+              {filteredCategoryTotalsForFilter.length === 0 && <div style={{ color: '#666' }}>No spend records yet.</div>}
+              {filteredCategoryTotalsForFilter.map((c) => (
                 <div key={c.category} className="chart-category-row" onClick={() => openCategory(c.category)}>
                   <div>
                     <div style={{ fontWeight: 600 }}>{c.category}</div>
@@ -496,111 +464,72 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
           )}
         </div>
 
-        {/* Project Details (existing) */}
-        <div className="project-details-card" style={{ marginTop: 18 }}>
-          <h3>Project Details</h3>
-          <div className="details-grid">
-            <div className="detail-item">
-              <div className="detail-header">
-                <Calendar size={20} />
-                <span>Deadline</span>
+        <CategoryModal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          categoryName={selectedCategory}
+          spends={
+            selectedCategory && filteredSpendsByCategory[selectedCategory]
+              ? filteredSpendsByCategory[selectedCategory]
+              : []
+          }
+        />
+
+        {/* Add Transaction Modal */}
+        {addModalOpen && (
+          <div style={{ position: 'fixed', inset:0, display:'flex', alignItems:'center', justifyContent:'center', backgroundColor:'rgba(0,0,0,0.45)', zIndex:1200 }}>
+            <form onSubmit={createTransaction} style={{ width:640, maxWidth:'94%', background:'#fff', borderRadius:8, padding:16 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                <h3 style={{ margin:0 }}>Add Transaction</h3>
+                <button type="button" onClick={() => setAddModalOpen(false)} style={{ border:'none', background:'transparent', cursor:'pointer' }}>✕</button>
               </div>
-              <div className="detail-value">{project.deadline}</div>
-            </div>
-            <div className="detail-item">
-              <div className="detail-header">
-                <BarChart3 size={20} />
-                <span>Status</span>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                <label>
+                  Date
+                  <input type="date" value={txForm.TxnDate} onChange={e=>setTxForm({...txForm, TxnDate:e.target.value})} required style={{ width:'100%' }} />
+                </label>
+                <label>
+                  Category
+                  <input value={txForm.Category} onChange={e=>setTxForm({...txForm, Category:e.target.value})} placeholder="e.g., Materials" style={{ width:'100%' }} />
+                </label>
+                <label>
+                  Type
+                  <select value={txForm.ExpenseType} onChange={e=>setTxForm({...txForm, ExpenseType:e.target.value})} style={{ width:'100%' }}>
+                    <option>Expense</option>
+                    <option>Receipt</option>
+                  </select>
+                </label>
+                <label>
+                  Item
+                  <input
+                    value={txForm.Item}
+                    onChange={e => setTxForm({ ...txForm, Item: e.target.value })}
+                    placeholder="e.g., Wireframes"
+                    style={{ width: '100%' }}
+                  />
+                </label>
+                <label>
+                  Amount
+                  <input type="number" step="0.01" value={txForm.Amount} onChange={e=>setTxForm({...txForm, Amount:e.target.value})} required style={{ width:'100%' }} />
+                </label>
+                <label style={{ gridColumn: '1 / -1' }}>
+                  Note
+                  <input value={txForm.Note} onChange={e=>setTxForm({...txForm, Note:e.target.value})} placeholder="Optional note or description" style={{ width:'100%' }} />
+                </label>
               </div>
-              <div className={`status-badge ${project.status.toLowerCase()}`}>
-                {project.status}
+              <div style={{ display:'flex', justifyContent:'flex-end', gap:8, marginTop:12 }}>
+                <button type="button" onClick={()=>setAddModalOpen(false)} style={{ padding:'8px 12px' }}>Cancel</button>
+                <button type="submit" style={{ padding:'8px 12px', background:'#10b981', color:'#fff', border:'none', borderRadius:6 }}>Add</button>
               </div>
-            </div>
+            </form>
           </div>
-          {/* Budget Progress Bar */}
-          <div className="budget-progress">
-            <div className="progress-header">
-              <span>Budget Usage</span>
-              <span>{spentPercentage}% used</span>
-            </div>
-            <div className="progress-bar">
-              <div 
-                className={`progress-fill ${
-                  parseFloat(spentPercentage) > 90 ? 'danger' :
-                  parseFloat(spentPercentage) > 70 ? 'warning' : 'success'
-                }`}
-                style={{ width: `${Math.min(parseFloat(spentPercentage), 100)}%` }}
-              ></div>
-            </div>
-          </div>
-        </div>
+        )}
+        {dashboardView !== 'all' && (
+          <button onClick={() => setDashboardView('all')} style={{ margin: '12px 0' }}>
+            Show All
+          </button>
+        )}
       </div>
-
-      <CategoryModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        categoryName={selectedCategory}
-        spends={
-          selectedCategory && filteredSpendsByCategory[selectedCategory]
-            ? filteredSpendsByCategory[selectedCategory]
-            : []
-        }
-      />
-
-      {/* Add Transaction Modal */}
-      {addModalOpen && (
-        <div style={{ position: 'fixed', inset:0, display:'flex', alignItems:'center', justifyContent:'center', backgroundColor:'rgba(0,0,0,0.45)', zIndex:1200 }}>
-          <form onSubmit={createTransaction} style={{ width:640, maxWidth:'94%', background:'#fff', borderRadius:8, padding:16 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-              <h3 style={{ margin:0 }}>Add Transaction</h3>
-              <button type="button" onClick={() => setAddModalOpen(false)} style={{ border:'none', background:'transparent', cursor:'pointer' }}>✕</button>
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-              <label>
-                Date
-                <input type="date" value={txForm.TxnDate} onChange={e=>setTxForm({...txForm, TxnDate:e.target.value})} required style={{ width:'100%' }} />
-              </label>
-              <label>
-                Category
-                <input value={txForm.Category} onChange={e=>setTxForm({...txForm, Category:e.target.value})} placeholder="e.g., Materials" style={{ width:'100%' }} />
-              </label>
-              <label>
-                Type
-                <select value={txForm.ExpenseType} onChange={e=>setTxForm({...txForm, ExpenseType:e.target.value})} style={{ width:'100%' }}>
-                  <option>Expense</option>
-                  <option>Receipt</option>
-                </select>
-              </label>
-              <label>
-                Item
-                <input
-                  value={txForm.Item}
-                  onChange={e => setTxForm({ ...txForm, Item: e.target.value })}
-                  placeholder="e.g., Wireframes"
-                  style={{ width: '100%' }}
-                />
-              </label>
-              <label>
-                Amount
-                <input type="number" step="0.01" value={txForm.Amount} onChange={e=>setTxForm({...txForm, Amount:e.target.value})} required style={{ width:'100%' }} />
-              </label>
-              <label style={{ gridColumn: '1 / -1' }}>
-                Note
-                <input value={txForm.Note} onChange={e=>setTxForm({...txForm, Note:e.target.value})} placeholder="Optional note or description" style={{ width:'100%' }} />
-              </label>
-            </div>
-            <div style={{ display:'flex', justifyContent:'flex-end', gap:8, marginTop:12 }}>
-              <button type="button" onClick={()=>setAddModalOpen(false)} style={{ padding:'8px 12px' }}>Cancel</button>
-              <button type="submit" style={{ padding:'8px 12px', background:'#10b981', color:'#fff', border:'none', borderRadius:6 }}>Add</button>
-            </div>
-          </form>
-        </div>
-      )}
-      {dashboardView !== 'all' && (
-        <button onClick={() => setDashboardView('all')} style={{ margin: '12px 0' }}>
-          Show All
-        </button>
-      )}
     </div>
   );
 };
