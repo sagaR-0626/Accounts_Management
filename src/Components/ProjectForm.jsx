@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 
 const API_BASE = 'http://localhost:3001';
 
-const ProjectForm = ({ organizationId, departments = [], onCreated, onCancel }) => {
+const ProjectForm = ({ organizationId, departments = [], onCreated, onCancel, projectsFromFile = [], getFilteredProjects, calculateTotals }) => {
   const [form, setForm] = useState({
     name: '',
     departmentId: '',
@@ -81,6 +81,19 @@ const ProjectForm = ({ organizationId, departments = [], onCreated, onCancel }) 
           <button type="button" onClick={onCancel}>Cancel</button>
         </div>
       </form>
+      <div>
+        <h3>Project List</h3>
+        <ul>
+          {(projectsFromFile.length > 0 ? projectsFromFile : getFilteredProjects()).map(project => (
+            <li key={project.id}>
+              {project.name} - {project.status}
+            </li>
+          ))}
+        </ul>
+        <div>
+          <strong>Totals:</strong> {JSON.stringify(calculateTotals(projectsFromFile.length > 0 ? projectsFromFile : getFilteredProjects()))}
+        </div>
+      </div>
     </div>
   );
 };

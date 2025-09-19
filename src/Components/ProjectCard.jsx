@@ -4,6 +4,13 @@ import { Eye } from 'lucide-react';
 const ProjectCard = ({ project, onSelect }) => {
   const progressPercentage = (project.spent / project.budget) * 100;
 
+  // Safely handle department fields
+  const dept = project.department || project.departmentName;
+  const deptLower = dept ? dept.toLowerCase() : '';
+
+  // Safely handle status field
+  const statusLower = project.status ? project.status.toLowerCase() : '';
+
   return (
     <div className="project-card" onClick={() => onSelect(project)}>
       <div className="project-card-header">
@@ -12,8 +19,8 @@ const ProjectCard = ({ project, onSelect }) => {
           <div className="project-name">{project.name}</div>
         </div>
         <div className="project-actions">
-          <div className={`status-badge ${project.status.toLowerCase()}`}>
-            {project.status}
+          <div className={`status-badge ${statusLower}`}>
+            {project.status || 'Unknown'}
           </div>
           <Eye size={18} className="view-icon" />
         </div>

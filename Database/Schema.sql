@@ -45,22 +45,17 @@ CREATE TABLE IF NOT EXISTS `Clients` (
       ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS `Transactions` (
-  `TxnID`        INT           PRIMARY KEY AUTO_INCREMENT,
-  `OrganizationID` INT         NOT NULL,
-  `ProjectID`    INT           NULL,
-  `TxnDate`      DATE          NOT NULL,
-  `Category`     VARCHAR(100)  NOT NULL,
-  `ExpenseType`  ENUM('Expense','Income') NOT NULL,
-  `Item`         VARCHAR(255),
-  `Note`         TEXT,
-  `Amount`       DECIMAL(15,2) NOT NULL,
-  FOREIGN KEY (`OrganizationID`)
-    REFERENCES `Organizations`(`OrganizationID`)
-      ON DELETE CASCADE,
-  FOREIGN KEY (`ProjectID`)
-    REFERENCES `Projects`(`ProjectID`)
-      ON DELETE CASCADE
+DROP TABLE IF EXISTS Transactions;
+CREATE TABLE IF NOT EXISTS Transactions (
+  TxnID INT PRIMARY KEY AUTO_INCREMENT,
+  ProjectID VARCHAR(255),
+  OrganizationID INT,
+  TxnDate DATE,
+  Category VARCHAR(255),
+  ExpenseType VARCHAR(255),
+  Item VARCHAR(255),
+  Note TEXT,
+  Amount DECIMAL(15,2)
 );
 
 CREATE TABLE IF NOT EXISTS `AuditUploads` (

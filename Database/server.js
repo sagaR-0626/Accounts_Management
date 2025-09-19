@@ -28,9 +28,6 @@ app.post('/import-transactions', async (req, res) => {
   let inserted = 0;
   for (const row of rows) {
     try {
-      if (row.OrganizationID !== req.body.organizationId) {
-        // return error
-      }
       await pool.query(
         `INSERT INTO Transactions (ProjectID, OrganizationID, TxnDate, Category, ExpenseType, Item, Note, Amount)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -62,23 +59,16 @@ const adminConn = mysql.createConnection({
 adminConn.query(
   `CREATE DATABASE IF NOT EXISTS \`${process.env.MYSQL_DATABASE}\`;`,
   async (err) => {
-    if (err) {
-      console.error('Error creating database:', err);
-      process.exit(1);
-    }
-    console.log(`Database "${process.env.MYSQL_DATABASE}" is ready.`);
+    if (err) { /* handle error */ }
     adminConn.end();
 
-    // 3) Now create your pool pointing at that database
+    // Create pool
     const pool = mysql.createPool({
       host: process.env.MYSQL_HOST,
       user: process.env.MYSQL_USER,
       password: process.env.MYSQL_PASSWORD,
       database: process.env.MYSQL_DATABASE,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-      multipleStatements: true   // 👈 important
+      multipleStatements: true
     }).promise();
 
     async function executeSQLScript(pool, filePath) {
@@ -689,7 +679,7 @@ adminConn.query(
 
     // Start the server
     app.listen(port, () => {
-      console.log(`Server is running on port ${port}`);
+      console.log(`Server running on port ${port}`);
     });
   }
 );

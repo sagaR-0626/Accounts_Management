@@ -71,16 +71,25 @@ const CategoryModal = ({ open, onClose, categoryName, spends }) => {
 };
 
 const ProjectDashboard = ({ project, organization, onBack }) => {
-  // create a local mutable copy so we can update spent in real time
+  // All hooks at the top
   const [projectState, setProjectState] = useState(project);
+  const transactions = project?.transactions || [];
+  const [categoryTotals, setCategoryTotals] = useState([]);
+  const [spendsByCategory, setSpendsByCategory] = useState({});
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [txForm, setTxForm] = useState({
+    TxnDate: new Date().toISOString().slice(0,10),
+    Category: '',
+    ExpenseType: 'Expense',
+    Item: '',
+    Note: '',
+    Amount: ''
+  });
+  const [dashboardView, setDashboardView] = useState('all');
 
-  // Use only transactions for this project
-  const transactions = project.transactions || [];
-
-  // Category totals and spends
-  const [categoryTotals, setCategoryTotals] = useState([]); // [{category, total}]
-  const [spendsByCategory, setSpendsByCategory] = useState({}); // { category: [spendItems] }
-
+  // Move useEffect hooks here, before any return!
   useEffect(() => {
     // Calculate category totals and spends for this project only
     const catTotals = {};
@@ -100,24 +109,30 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
     });
     setCategoryTotals(Object.entries(catTotals).map(([category, total]) => ({ category, total })));
     setSpendsByCategory(spendsCat);
-  }, [project]);
+  }, [transactions]);
 
   useEffect(() => {
     if (!project) return;
     // normalize server / client field-name variations so AR/AP/Spending/Budget are always available
     const normalized = {
       ...project,
-      // AR may come as AR or ar
       ar: Number(project.AR ?? project.ar ?? project.arVal ?? 0),
-      // AP may come as AP or ap; fallback to Spending if that's what backend uses
       ap: Number(project.AP ?? project.ap ?? project.Spending ?? project.Spening ?? 0),
-      // Spending/spent normalization
       Spending: Number(project.Spending ?? project.spent ?? project.Spen ?? 0),
-      // Budget normalization
       Budget: Number(project.Budget ?? project.budget ?? 0)
     };
     setProjectState(normalized);
   }, [project]);
+
+  // Now do conditional rendering
+  if (!project) return <div>No project selected.</div>;
+
+  // Define createTransaction to fix no-undef error
+  const createTransaction = (e) => {
+    e.preventDefault();
+    // Implement transaction creation logic here if needed
+    alert('Add transaction functionality is not implemented yet.');
+  };
 
   // Normalize names: support DB fields (Budget, Spending) and previous props (budget, spent)
   const budgetVal = Number(projectState.Budget ?? projectState.budget ?? project.budget ?? 0);
@@ -130,64 +145,47 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
   const spentVal = Number(projectState.Spending ?? projectState.spent ?? project.spent ?? 0);
   const spentPercentage = budgetVal ? ((spentVal / budgetVal) * 100).toFixed(1) : '0.0';
 
-  const [selectedCategory, setSelectedCategory] = useState('all'); // Use 'all' for default
-  const [modalOpen, setModalOpen] = useState(false);
-
-  // Add transaction modal state
-  const [addModalOpen, setAddModalOpen] = useState(false);
-  const [txForm, setTxForm] = useState({
-    TxnDate: new Date().toISOString().slice(0,10),
-    Category: '',
-    ExpenseType: 'Expense',
-    Item: '',
-    Note: '',
-    Amount: ''
-  });
-
-  // Fix: define createTransaction as a stub to remove error
-  const createTransaction = (e) => {
-    e.preventDefault();
-    // You can implement transaction creation logic here if needed
-    alert('Add transaction functionality is not implemented yet.');
+  const openCategory = (cat) => {
+    setSelectedCategory(cat);
+    setModalOpen(true);
   };
 
-  // New state for dashboard view
-  const [dashboardView, setDashboardView] = useState('all'); // 'all', 'ar', 'ap'
+  // 1. Define helpers FIRST
+  function isAR(tx) {
+    return tx.ExpenseType && ['receipt', 'income'].includes(tx.ExpenseType.toLowerCase());
+  }
+  function isAP(tx) {
+    return tx.ExpenseType && tx.ExpenseType.toLowerCase() === 'expense';
+  }
 
-  // 2. Filtered helpers
-  const filteredCategoryTotals = dashboardView === 'all'
-    ? categoryTotals
-    : categoryTotals.filter(c => {
-        if (dashboardView === 'ar') {
-          // Only categories with income transactions
-          return spendsByCategory[c.category].some(tx => {
-            const txObj = transactions.find(t => (t.Category || 'Uncategorized') === c.category && (t.Item || t.Note || '') === tx.item);
-            return txObj && ((txObj.ExpenseType || '').toLowerCase() === 'income' || (txObj.Category || '').toLowerCase().includes('income') || (txObj.Category || '').toLowerCase().includes('revenue'));
-          });
-        } else if (dashboardView === 'ap') {
-          // Only categories with expense transactions
-          return spendsByCategory[c.category].some(tx => {
-            const txObj = transactions.find(t => (t.Category || 'Uncategorized') === c.category && (t.Item || t.Note || '') === tx.item);
-            return txObj && (txObj.ExpenseType || '').toLowerCase() === 'expense';
-          });
-        }
-        return true;
-      });
+  // Filter transactions based on dashboardView
+  const filteredTransactions = dashboardView === 'all'
+    ? transactions
+    : transactions.filter(tx => dashboardView === 'ar' ? isAR(tx) : isAP(tx));
 
-  const filteredSpendsByCategory = {};
-  filteredCategoryTotals.forEach(c => {
-    filteredSpendsByCategory[c.category] = spendsByCategory[c.category].filter(tx => {
-      const txObj = transactions.find(t => (t.Category || 'Uncategorized') === c.category && (t.Item || t.Note || '') === tx.item);
-      if (dashboardView === 'ar') {
-        return txObj && ((txObj.ExpenseType || '').toLowerCase() === 'income' || (txObj.Category || '').toLowerCase().includes('income') || (txObj.Category || '').toLowerCase().includes('revenue'));
-      } else if (dashboardView === 'ap') {
-        return txObj && (txObj.ExpenseType || '').toLowerCase() === 'expense';
-      }
-      return true;
+  // Recalculate categoryTotals and spendsByCategory for filteredTransactions
+  const filteredCatTotals = {};
+  const filteredSpendsCat = {};
+  filteredTransactions.forEach(tx => {
+    const cat = tx.Category || 'Uncategorized';
+    const amt = Number(tx.Amount || 0);
+    if (!filteredCatTotals[cat]) filteredCatTotals[cat] = 0;
+    filteredCatTotals[cat] += amt;
+    if (!filteredSpendsCat[cat]) filteredSpendsCat[cat] = [];
+    filteredSpendsCat[cat].push({
+      item: tx.Item || tx.Note || '',
+      amount: amt,
+      date: tx.TxnDate || tx.Date || '',
+      note: tx.Note || '',
     });
   });
+  const filteredCategoryTotals = Object.entries(filteredCatTotals).map(([category, total]) => ({ category, total }));
+  const filteredSpendsByCategory = selectedCategory === 'all'
+    ? filteredSpendsCat
+    : { [selectedCategory]: filteredSpendsCat[selectedCategory] || [] };
 
-  // Chart
+  const categoryList = filteredCategoryTotals.map(c => c.category);
+
   const doughnutData = {
     labels: filteredCategoryTotals.map(c => c.category),
     datasets: [{
@@ -197,33 +195,6 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
       ].slice(0, filteredCategoryTotals.length)
     }]
   };
-
-  const openCategory = (cat) => {
-    setSelectedCategory(cat);
-    setModalOpen(true);
-  };
-
-  // 1. Define helpers FIRST
-  function isAR(tx) {
-    return tx.expenseType && ['receipt', 'income'].includes(tx.expenseType.toLowerCase());
-  }
-  function isAP(tx) {
-    return tx.expenseType && tx.expenseType.toLowerCase() === 'expense';
-  }
-
-  // Prepare category list for filter
-  const categoryList = categoryTotals.map(c => c.category);
-
-  // Filtered spends/cards based on selectedCategory
-  const filteredCategoryTotalsForFilter = selectedCategory === 'all'
-    ? filteredCategoryTotals
-    : filteredCategoryTotals.filter(c => c.category === selectedCategory);
-
-  const filteredSpendsByCategoryForFilter = selectedCategory === 'all'
-    ? filteredSpendsByCategory
-    : {
-        [selectedCategory]: filteredSpendsByCategory[selectedCategory] || []
-      };
 
   return (
     <div className="dashboard-main">
@@ -240,7 +211,8 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
                 {projectState.Name || projectState.name || projectState.ProjectName || project.Name}
               </h1>
               <p style={{ margin: 0, fontSize: 14 }}>
-                {projectState.ProjectID ?? projectState.id ?? project.ProjectID ?? project.id} - {organization.name}
+                {projectState.ProjectID ?? projectState.id ?? project.ProjectID ?? project.id}
+                {organization && organization.name ? ` - ${organization.name}` : ''}
               </p>
             </div>
           </div>
@@ -281,8 +253,8 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
             <div style={{ fontSize: '2rem', fontWeight: 700, color: '#10b981', marginBottom: '1rem' }}>
               {arVal.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
             </div>
-            <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
-              Amount pending to be received from clients
+            <p stylclientse={{ color: '#6b7280', marginBottom: '1.5rem' }}>
+             
             </p>
             <div style={{ padding: '1rem', borderRadius: 12, background: 'rgba(16,185,129,0.1)' }}>
               <div style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 4, color: '#047857' }}>
@@ -314,7 +286,7 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
               {apVal.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
             </div>
             <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
-              Amount pending to be paid to vendors
+              
             </p>
             <div style={{ padding: '1rem', borderRadius: 12, background: 'rgba(239,68,68,0.1)' }}>
               <div style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 4, color: '#dc2626' }}>
@@ -370,24 +342,24 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
               ) : (
                 <div>
                   <h4>{selectedCategory} Details</h4>
-                  {filteredSpendsByCategoryForFilter[selectedCategory] &&
-                    filteredSpendsByCategoryForFilter[selectedCategory].length > 0 ? (
+                  {filteredSpendsByCategory[selectedCategory] &&
+                    filteredSpendsByCategory[selectedCategory].length > 0 ? (
                     <>
                       <div style={{ height: 320, width: '100%', display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
                         <Doughnut
                           data={{
-                            labels: filteredSpendsByCategoryForFilter[selectedCategory].map(s => s.item || s.note || 'Expense'),
+                            labels: filteredSpendsByCategory[selectedCategory].map(s => s.item || s.note || 'Expense'),
                             datasets: [{
-                              data: filteredSpendsByCategoryForFilter[selectedCategory].map(s => s.amount),
+                              data: filteredSpendsByCategory[selectedCategory].map(s => s.amount),
                               backgroundColor: [
                                 '#3b82f6', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#06b6d4', '#f59e0b'
-                              ].slice(0, filteredSpendsByCategoryForFilter[selectedCategory].length)
+                              ].slice(0, filteredSpendsByCategory[selectedCategory].length)
                             }]
                           }}
                         />
                       </div>
                       <div>
-                        {filteredSpendsByCategoryForFilter[selectedCategory].map((item, idx) => (
+                        {filteredSpendsByCategory[selectedCategory].map((item, idx) => (
                           <div key={idx} style={{
                             display: 'flex', justifyContent: 'space-between', padding: '8px 0',
                             borderBottom: '1px solid #f0f0f0'
@@ -410,8 +382,8 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
               )}
             </div>
             <div className="chart-description">
-              {filteredCategoryTotalsForFilter.length === 0 && <div style={{ color: '#666' }}>No spend records yet.</div>}
-              {filteredCategoryTotalsForFilter.map((c) => (
+              {filteredCategoryTotals.length === 0 && <div style={{ color: '#666' }}>No spend records yet.</div>}
+              {filteredCategoryTotals.map((c) => (
                 <div key={c.category} className="chart-category-row" onClick={() => openCategory(c.category)}>
                   <div>
                     <div style={{ fontWeight: 600 }}>{c.category}</div>
@@ -435,7 +407,7 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
           gridTemplateColumns: 'repeat(auto-fit, minmax(220px,1fr))',
           gap: 12
         }}>
-          {categoryTotals.map(c => (
+          {filteredCategoryTotals.map(c => (
             <div key={c.category} onClick={() => openCategory(c.category)} style={{
               background: '#fff', padding: 12, borderRadius: 10, cursor: 'pointer',
               boxShadow: '0 6px 18px rgba(0,0,0,0.04)'
@@ -447,7 +419,7 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
                 </div>
               </div>
               <div style={{ color: '#666', fontSize: 13, marginBottom: 8 }}>
-                {c.txs ? `${c.txs.length} transactions` : '—'}
+                {/* You can add transaction count if needed */}
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
                 <div style={{ padding: '6px 8px', borderRadius: 6, background: 'rgba(59,130,246,0.08)', color: '#0f172a', fontSize: 12 }}>
@@ -459,7 +431,7 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
               </div>
             </div>
           ))}
-          {categoryTotals.length === 0 && (
+          {filteredCategoryTotals.length === 0 && (
             <div style={{ color: '#666', padding: 12 }}>No category spends to show.</div>
           )}
         </div>

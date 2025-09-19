@@ -20,8 +20,8 @@ const OrganizationDashboard = ({ isLoggedIn, onLogout }) => {
   const location = useLocation();
   const userEmail = location.state?.userEmail || '';
   const organizationId = location.state?.organizationId || null;
- 
-  // Load initial view from localStorage, fallback to 'organizations'
+
+  // --- State declarations ---
   const [view, setView] = useState(() => localStorage.getItem('dashboardView') || 'organizations');
   const [selectedOrg, setSelectedOrg] = useState(() => {
     const org = localStorage.getItem('selectedOrg');
@@ -33,7 +33,7 @@ const OrganizationDashboard = ({ isLoggedIn, onLogout }) => {
     return proj ? JSON.parse(proj) : null;
   });
   const [organizations, setOrganizations] = useState([]);
-  const [rawProjects, setRawProjects] = useState([]); // raw rows from API (contain DepartmentName etc.)
+  const [rawProjects, setRawProjects] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [totals, setTotals] = useState({ budget:0, spent:0, profit:0, ar:0, ap:0, team:0 });
   const [showNewProjectForm, setShowNewProjectForm] = useState(false);
@@ -44,8 +44,21 @@ const OrganizationDashboard = ({ isLoggedIn, onLogout }) => {
   const [showAmountPopup, setShowAmountPopup] = useState(false);
   const [dateFilter, setDateFilter] = useState({ from: '', to: '' });
   const [showUploadedPreview, setShowUploadedPreview] = useState(false);
-  const navigate = useNavigate(); // Add this line
- 
+  const navigate = useNavigate();
+
+  // --- ADD THIS BLOCK RIGHT HERE ---
+  useEffect(() => {
+    // Restore uploaded data and projects from localStorage if present
+    const savedData = localStorage.getItem('uploadedData');
+    const savedProjects = localStorage.getItem('projectsFromFile');
+    if (savedData && savedProjects) {
+      setUploadedData(JSON.parse(savedData));
+      setProjectsFromFile(JSON.parse(savedProjects));
+      setShowUploadedPreview(true);
+    }
+  }, []);
+  // --- END BLOCK ---
+
   // Save view/page state to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('dashboardView', view);
@@ -99,20 +112,27 @@ const OrganizationDashboard = ({ isLoggedIn, onLogout }) => {
   //   }
   // }, [userEmail, organizations]);
  
-  // Auto-select organization if organizationId is present
-  useEffect(() => {
-  if (!organizationId || !organizations.length) return;
-  const orgToSelect = organizations.find(o => o.id === Number(organizationId));
-  if (orgToSelect && (!selectedOrg || selectedOrg.id !== orgToSelect.id)) {
-    handleOrgSelect(orgToSelect.id);
-  }
-}, [organizationId, organizations]);
+  // Auto-select organization if organizationId is present (DISABLED to always show selector)
+  // useEffect(() => {
+  //   if (!organizationId || !organizations.length) return;
+  //   const orgToSelect = organizations.find(o => o.id === Number(organizationId));
+  //   if (orgToSelect && (!selectedOrg || selectedOrg.id !== orgToSelect.id)) {
+  //     handleOrgSelect(orgToSelect.id);
+  //   }
+  // }, [organizationId, organizations]);
  
   const handleOrgSelect = async (orgId) => {
     setSelectedDept('all');
     setSelectedProject(null);
     setView('dashboard');
- 
+
+    // Clear uploaded file state when switching organizations
+    setProjectsFromFile([]);
+    setUploadedData([]);
+    setShowUploadedPreview(false);
+    setUploadFileName('');
+    setUploadError('');
+
     try {
       // get organization details
       const orgRes = await fetch(`${API_BASE}/organizations/${orgId}`);
@@ -148,11 +168,12 @@ const OrganizationDashboard = ({ isLoggedIn, onLogout }) => {
  
       setRawProjects(mappedProjects);
       // set selectedOrg with API info + mapped projects
+      // Always use the name from organizations list if missing in API response
       setSelectedOrg({
         id: orgData.OrganizationID || orgId,
-        name: orgData.Name || '',
-        type: orgData.Type || '',
-        description: orgData.Description || '',
+        name: orgData.Name && orgData.Name.trim() ? orgData.Name : (organizations.find(o => o.id === orgId)?.name || ''),
+        type: orgData.Type && orgData.Type.trim() ? orgData.Type : (organizations.find(o => o.id === orgId)?.type || ''),
+        description: orgData.Description && orgData.Description.trim() ? orgData.Description : (organizations.find(o => o.id === orgId)?.description || ''),
         projects: mappedProjects,
         color: organizations.find(o => o.id === orgId)?.color || '#3b82f6',
         icon: organizations.find(o => o.id === orgId)?.icon || Building2
@@ -215,19 +236,14 @@ const OrganizationDashboard = ({ isLoggedIn, onLogout }) => {
       setRawProjects([]);
       setDepartments([]);
       setTotals({ budget:0, spent:0, profit:0, ar:0, ap:0, team:0 });
+      // DO NOT clear uploadedData or projectsFromFile here!
     }
   };
  
   const getFilteredProjects = () => {
     // If projectsFromFile is present, use it for projects
     if (projectsFromFile && projectsFromFile.length > 0) {
-      if (selectedDept === 'all') {
-        return projectsFromFile;
-      } else if (selectedDept === 'infra') {
-        return projectsFromFile.filter(p => (p.departmentName || '').toLowerCase().includes('infra'));
-      } else if (selectedDept === 'designstudioz') {
-        return projectsFromFile.filter(p => (p.departmentName || '').toLowerCase().includes('design'));
-      }
+      // If no department info, just return all
       return projectsFromFile;
     }
     // Otherwise, use DB data
@@ -235,13 +251,7 @@ const OrganizationDashboard = ({ isLoggedIn, onLogout }) => {
     if (selectedOrg.id === 1 && selectedOrg.projects) {
       return selectedOrg.projects;
     }
-    if (selectedDept === 'all') {
-      return rawProjects;
-    } else if (selectedDept === 'infra') {
-      return rawProjects.filter(p => (p.departmentName || '').toLowerCase().includes('infras') || (p.departmentName || '').toLowerCase().includes('infra'));
-    } else if (selectedDept === 'designstudioz') {
-      return rawProjects.filter(p => (p.departmentName || '').toLowerCase().includes('design'));
-    }
+    // If no department info, just return all
     return rawProjects;
   };
  
@@ -423,32 +433,22 @@ const OrganizationDashboard = ({ isLoggedIn, onLogout }) => {
  
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
-    if (!file || !selectedOrg?.id) return;
+    if (!file) return;
+    try {
+      const parsedData = await parseFile(file);
+      setUploadedData(parsedData);
+      localStorage.setItem('uploadedData', JSON.stringify(parsedData)); // Save to localStorage
 
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      const data = evt.target.result;
-      const workbook = XLSX.read(data, { type: 'binary' });
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
-      const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      const groupedProjects = groupProjectsById(parsedData);
+      setProjectsFromFile(groupedProjects);
+      localStorage.setItem('projectsFromFile', JSON.stringify(groupedProjects)); // Save to localStorage
 
-      // POST to backend to save in DB
-      await fetch('http://localhost:3001/import-transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          rows: json,
-          organizationId: selectedOrg.id,
-          fileName: file.name,
-          uploaderEmail: userEmail // if available
-        })
-      });
-
-      // After upload, reload org/projects from DB
-      await handleOrgSelect(selectedOrg.id);
-    };
-    reader.readAsBinaryString(file);
+      setShowUploadedPreview(true);
+      setUploadFileName(file.name);
+      setUploadError('');
+    } catch (err) {
+      setUploadError('Failed to parse file.');
+    }
   };
  
     // Helper function to calculate metrics from Excel data
@@ -474,23 +474,26 @@ const OrganizationDashboard = ({ isLoggedIn, onLogout }) => {
     const handleSaveToDB = async () => {
       if (!uploadedData.length) return;
       const res = await fetch(`${API_BASE}/import-transactions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        rows: uploadedData,
-        uploaderEmail: userEmail,
-        fileName: uploadFileName,
-        organizationId: selectedOrg?.id || null
-      })
-    });
-    const result = await res.json();
-    alert(result.message || 'Import complete');
-    setShowUploadedPreview(true); // Show preview after saving
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rows: uploadedData,
+          uploaderEmail: userEmail,
+          fileName: uploadFileName,
+          organizationId: selectedOrg?.id || null
+        })
+      });
+      const result = await res.json();
+      alert(result.message || 'Import complete');
 
-    setUploadedData([]);
-    setProjectsFromFile([]);
-    await handleOrgSelect(selectedOrg.id); // Reload from DB
-  };
+      // Clear upload state and reload organization data from DB
+      setShowUploadedPreview(false);
+      setUploadedData([]);
+      setProjectsFromFile([]);
+      setUploadFileName('');
+      setUploadError('');
+      await handleOrgSelect(selectedOrg.id); // Reload from DB
+    };
  
   // Move this helper function up, before you use it!
   const getFilteredUploadedData = () => {
@@ -644,6 +647,38 @@ const getInitialAmountFromExcel = (data) => {
     return { initialAmount, totalExpenses, totalIncome, remaining, expenseDetails, incomeDetails };
 };
  
+  // Helper to group non-project transactions
+  function getOtherTransactions(data) {
+    return data.filter(row => !row.ProjectID && !row.ProjectName && !row.projectId && !row.projectName);
+  }
+ 
+  // Helper to create "Other" pseudo-project
+  function getOtherProject(data) {
+    const otherTxs = getOtherTransactions(data);
+    if (!otherTxs.length) return null;
+    const ar = otherTxs
+      .filter(tx => (tx.ExpenseType || tx.expenseType || '').toLowerCase() === 'income' || (tx.ExpenseType || tx.expenseType || '').toLowerCase() === 'receipt')
+      .reduce((sum, tx) => sum + Number(tx.Amount || tx.amount || 0), 0);
+    const ap = otherTxs
+      .filter(tx => (tx.ExpenseType || tx.expenseType || '').toLowerCase() === 'expense')
+      .reduce((sum, tx) => sum + Number(tx.Amount || tx.amount || 0), 0);
+    return {
+      id: 'other',
+      name: 'Other (Non-Project)',
+      transactions: otherTxs,
+      ar,
+      ap,
+      profit: ar - ap,
+    };
+  }
+ 
+  const projectsData = projectsFromFile.length > 0 ? projectsFromFile : getFilteredProjects();
+  let dashboardProjects = [...projectsData];
+  if (uploadedData.length > 0) {
+    const otherProject = getOtherProject(uploadedData);
+    if (otherProject) dashboardProjects.push(otherProject);
+  }
+ 
   return (
     <>
       <Header isLoggedIn={isLoggedIn} onLogout={onLogout} />
@@ -653,7 +688,7 @@ const getInitialAmountFromExcel = (data) => {
           onSelect={handleOrgSelect}
         />
       )}
- 
+
       {view === 'project' && selectedProject && (
         <ProjectDashboard
           project={selectedProject}
@@ -661,7 +696,7 @@ const getInitialAmountFromExcel = (data) => {
           onBack={handleBack}
         />
       )}
- 
+
       {view === 'dashboard' && (
         <>
           <CompanyDashboard
@@ -670,10 +705,10 @@ const getInitialAmountFromExcel = (data) => {
             onDeptChange={setSelectedDept}
             onProjectSelect={handleProjectSelect}
             onAddProject={setShowNewProjectForm}
-            onFileUpload={handleFileUpload} // <-- Pass handler here
+            onFileUpload={handleFileUpload}
             onBack={handleBack}
-            projects={projectsFromFile.length > 0 ? projectsFromFile : getFilteredProjects()}
-            totals={calculateTotals(projectsFromFile.length > 0 ? projectsFromFile : getFilteredProjects())}
+            projects={dashboardProjects} // <-- this is correct!
+            totals={calculateTotals(dashboardProjects)}
           />
           {showNewProjectForm && selectedOrg && (
             <NewProjectModal
@@ -685,7 +720,7 @@ const getInitialAmountFromExcel = (data) => {
           )}
         </>
       )}
- 
+
       {/* Amount Breakdown Popup */}
       {showAmountPopup && uploadedData.length > 0 && (
         <AmountBreakdownPopup
@@ -739,4 +774,65 @@ const AmountBreakdownPopup = ({ breakdown, onClose }) => (
   </div>
 );
  
+const parseFile = async (file) => {
+  // CSV
+  if (file.name.endsWith('.csv')) {
+    return new Promise((resolve, reject) => {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => resolve(results.data),
+        error: (err) => reject(err)
+      });
+    });
+  }
+  // Excel (xlsx/xls)
+  if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+        resolve(json);
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  }
+  throw new Error('Unsupported file type');
+};
+
+function groupProjectsById(data) {
+  const projectsMap = {};
+  data.forEach(row => {
+    const pid = row.ProjectID || row.projectId || row.project_id || row.ProjectName || row.projectName;
+    if (!pid) return;
+    if (!projectsMap[pid]) {
+      projectsMap[pid] = {
+        id: pid,
+        name: row.ProjectName || row.projectName || `Project ${pid}`,
+        transactions: [],
+        ar: 0,
+        ap: 0,
+        profit: 0,
+      };
+    }
+    projectsMap[pid].transactions.push(row);
+  });
+  // Calculate AR, AP, Profit for each project
+  Object.values(projectsMap).forEach(project => {
+    project.ar = project.transactions
+      .filter(tx => (tx.ExpenseType || tx.expenseType || '').toLowerCase() === 'income' || (tx.ExpenseType || tx.expenseType || '').toLowerCase() === 'receipt')
+      .reduce((sum, tx) => sum + Number(tx.Amount || tx.amount || 0), 0);
+    project.ap = project.transactions
+      .filter(tx => (tx.ExpenseType || tx.expenseType || '').toLowerCase() === 'expense')
+      .reduce((sum, tx) => sum + Number(tx.Amount || tx.amount || 0), 0);
+    project.profit = project.ar - project.ap;
+  });
+  return Object.values(projectsMap);
+}
+
 export default OrganizationDashboard;
