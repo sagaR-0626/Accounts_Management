@@ -3,98 +3,31 @@ import { Doughnut } from 'react-chartjs-2';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { TrendingUp, TrendingDown, BarChart3, List } from 'lucide-react';
 import Header from './Header'; // Make sure this is your full-width header
+import { getBreakdownByCategory } from '../utils/Calculations';
 
 const ARAPBreakdown = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { projects = [], organization = {}, type } = location.state || {};
-  console.log('ARAPBreakdown received:', { projects, organization, type });
-  // Persist viewMode in localStorage
-  const [viewMode, setViewMode] = useState(() => localStorage.getItem('arapViewMode') || 'chart');
-  const handleViewChange = (mode) => {
-    setViewMode(mode);
-    localStorage.setItem('arapViewMode', mode);
-  } // 'chart' or 'list'
+  const { transactions = [], organization = {}, type } = location.state || {};
 
-  if (!organization || !type || (type !== 'ar' && type !== 'ap')) {
-    return (
-      <div style={{ 
-        padding: 32, 
-        textAlign: 'center',
-        background: '#f8fafc',
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        <div style={{
-          background: '#fff',
-          padding: 48,
-          borderRadius: 16,
-          boxShadow: '0 4px 16px rgba(0,0,0,0.04)'
-        }}>
-          <h2 style={{ color: '#ef4444', marginBottom: 16 }}>Invalid Data</h2>
-          <p style={{ color: '#666', marginBottom: 24 }}>Unable to load breakdown data.</p>
-          <button 
-            onClick={() => navigate(-1)}
-            style={{
-              background: '#2563eb',
-              color: '#fff',
-              border: 'none',
-              padding: '12px 24px',
-              borderRadius: 8,
-              cursor: 'pointer',
-              fontWeight: 500
-            }}
-          >
-            Go Back
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Get breakdown by category
+  const breakdown = getBreakdownByCategory(transactions, type);
 
-  // Calculate filtered projects and "Other" transactions
-  const filteredProjects = projects.filter(p => type === 'ar' ? p.ar > 0 : p.ap > 0);
-  
-  // Get "Other" transactions (non-project)
-  const otherTxs = (organization?.transactions || []).filter(tx => !tx.projectId && !tx.project);
-  const otherAR = otherTxs.filter(tx => (tx.ExpenseType || tx.expenseType) === 'Income')
-    .reduce((sum, tx) => sum + Number(tx.Amount || tx.amount || 0), 0);
-  const otherAP = otherTxs.filter(tx => (tx.ExpenseType || tx.expenseType) === 'Expense')
-    .reduce((sum, tx) => sum + Number(tx.Amount || tx.amount || 0), 0);
+  // Prepare chart data
+  const categories = Object.keys(breakdown);
+  const amounts = Object.values(breakdown);
+  const totalAmount = amounts.reduce((sum, v) => sum + v, 0);
 
-  const otherValue = type === 'ar' ? otherAR : otherAP;
-
-  // Combine projects and other for chart
-  const allData = [
-    ...filteredProjects.map(p => ({
-      name: p.name || p.projectName || `Project ${p.id}`,
-      value: type === 'ar' ? p.ar : p.ap,
-      type: 'project',
-      id: p.id
-    })),
-    ...(otherValue > 0 ? [{
-      name: 'Other (Non-Project)',
-      value: otherValue,
-      type: 'other',
-      id: 'other'
-    }] : [])
-  ].sort((a, b) => b.value - a.value);
-
-  const totalAmount = allData.reduce((sum, item) => sum + item.value, 0);
-
-  // Chart colors
   const colors = [
-    '#3b82f6', '#10b981', '#f97316', '#ef4444', '#8b5cf6', 
+    '#3b82f6', '#10b981', '#f97316', '#ef4444', '#8b5cf6',
     '#06b6d4', '#f59e0b', '#ec4899', '#84cc16', '#6366f1'
   ];
 
   const chartData = {
-    labels: allData.map(item => item.name),
+    labels: categories,
     datasets: [{
-      data: allData.map(item => item.value),
-      backgroundColor: colors.slice(0, allData.length),
+      data: amounts,
+      backgroundColor: colors.slice(0, categories.length),
       borderWidth: 2,
       borderColor: '#fff',
       hoverBorderWidth: 3,
@@ -222,7 +155,7 @@ const ARAPBreakdown = () => {
               fontSize: 12,
               fontWeight: 600
             }}>
-              {allData.length} {allData.length === 1 ? 'Item' : 'Items'}
+              {categories.length} {categories.length === 1 ? 'Item' : 'Items'}
             </div>
           </div>
           <div style={{ 
@@ -237,7 +170,7 @@ const ARAPBreakdown = () => {
             fontSize: 14, 
             color: '#6b7280'
           }}>
-            Across {filteredProjects.length} projects {otherValue > 0 ? '+ other transactions' : ''}
+            Across {categories.length} categories
           </div>
         </div>
 
@@ -266,7 +199,7 @@ const ARAPBreakdown = () => {
             </h3>
           </div>
 
-          {allData.length > 0 ? (
+          {categories.length > 0 ? (
             <div style={{ 
               height: 400, 
               width: '100%', 
@@ -320,66 +253,63 @@ const ARAPBreakdown = () => {
           </div>
 
           <div style={{ padding: '0' }}>
-            {allData.length > 0 ? allData.map((item, index) => (
-              <div 
-                key={item.id}
-                style={{ 
-                  display: 'flex', 
+            {categories.length > 0 ? categories.map((cat, idx) => (
+              <div
+                key={cat}
+                style={{
+                  display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'space-between', 
+                  justifyContent: 'space-between',
                   padding: '20px 32px',
-                  borderBottom: index < allData.length - 1 ? '1px solid #f3f4f6' : 'none',
+                  borderBottom: idx < categories.length - 1 ? '1px solid #f3f4f6' : 'none',
                   transition: 'background 0.2s'
                 }}
-                onMouseEnter={(e) => e.target.style.background = '#f9fafb'}
-                onMouseLeave={(e) => e.target.style.background = 'transparent'}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                   <div style={{
                     width: 12,
                     height: 12,
                     borderRadius: '50%',
-                    background: colors[index % colors.length],
+                    background: colors[idx % colors.length],
                     flexShrink: 0
                   }} />
                   <div>
-                    <div style={{ 
+                    <div style={{
                       fontWeight: 600,
                       fontSize: 16,
                       color: '#374151',
                       marginBottom: 4
                     }}>
-                      {item.name}
+                      {cat}
                     </div>
                     <div style={{
                       fontSize: 13,
                       color: '#6b7280',
-                      background: item.type === 'project' ? '#dbeafe' : '#fef3c7',
-                      color: item.type === 'project' ? '#1d4ed8' : '#92400e',
+                      background: '#dbeafe',
+                      color: '#1d4ed8',
                       padding: '2px 8px',
                       borderRadius: 12,
                       display: 'inline-block'
                     }}>
-                      {item.type === 'project' ? 'Project' : 'Other'}
+                      Category
                     </div>
                   </div>
                 </div>
-                
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ 
+                  <div style={{
                     fontWeight: 700,
                     fontSize: 18,
                     color: titleColor,
                     marginBottom: 4
                   }}>
-                    ₹{item.value.toLocaleString('en-IN')}
+                    ₹{breakdown[cat].toLocaleString('en-IN')}
                   </div>
                   <div style={{
                     fontSize: 13,
                     color: '#6b7280',
                     fontWeight: 500
                   }}>
-                    {((item.value / totalAmount) * 100).toFixed(1)}% of total
+                    {((breakdown[cat] / totalAmount) * 100).toFixed(1)}% of total
                   </div>
                 </div>
               </div>

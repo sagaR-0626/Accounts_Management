@@ -67,3 +67,17 @@ CREATE TABLE IF NOT EXISTS `AuditUploads` (
   `OrganizationID` INT,
   `Notes` TEXT
 );
+
+CREATE TABLE IF NOT EXISTS ImportedTransactions (
+  ImportedTxnID INT PRIMARY KEY AUTO_INCREMENT,
+  OrganizationID INT,
+  OrgName VARCHAR(255),
+  TxnID VARCHAR(255),
+  TxnDate DATE,
+  Category VARCHAR(255),
+  Item VARCHAR(255),
+  Type VARCHAR(255),
+  Amount DECIMAL(15,2),
+  ProjectID VARCHAR(255),
+  ProjectName VARCHAR(255)
+);

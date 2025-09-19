@@ -14,41 +14,6 @@ app.use(express.json());
 // 1) Admin connection (no database specified)
 
 // Bulk import transactions and audit log
-app.post('/import-transactions', async (req, res) => {
-  const { rows, uploaderEmail, fileName, organizationId } = req.body;
-  if (!Array.isArray(rows)) return res.status(400).json({ error: 'Rows array required' });
-
-  // Save audit log with organizationId
-  await pool.query(
-    `INSERT INTO AuditUploads (UploaderEmail, FileName, RowCount, OrganizationID) VALUES (?, ?, ?, ?)`,
-    [uploaderEmail || 'unknown', fileName || '', rows.length, organizationId || null]
-  );
-
-  // Save transactions with organizationId
-  let inserted = 0;
-  for (const row of rows) {
-    try {
-      await pool.query(
-        `INSERT INTO Transactions (ProjectID, OrganizationID, TxnDate, Category, ExpenseType, Item, Note, Amount)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          row.ProjectID || null,
-          organizationId || null,
-          row.Date || row.TxnDate || new Date().toISOString().slice(0,10),
-          row.Category || 'Uncategorized',
-          row.ExpenseType || 'Expense',
-          row.Item || null,
-          row.Note || row.Description || null,
-          Number(row.Amount || 0)
-        ]
-      );
-      inserted++;
-    } catch (err) {
-      // skip failed row
-    }
-  }
-  res.json({ message: `Imported ${inserted} transactions.` });
-});
 const adminConn = mysql.createConnection({
   host: process.env.MYSQL_HOST,
   user: process.env.MYSQL_USER,
@@ -674,6 +639,109 @@ adminConn.query(
       } catch (err) {
         console.error('Error creating transaction:', err);
         res.status(500).json({ error: 'Failed to create transaction' });
+      }
+    });
+
+    // Add this helper function
+    function excelDateToJSDate(serial) {
+      if (serial === null || serial === undefined) return null;
+      const num = Number(serial);
+      if (!Number.isNaN(num)) {
+        const utc_days = Math.floor(num - 25569);
+        const utc_value = utc_days * 86400;
+        const date_info = new Date(utc_value * 1000);
+        return date_info.toISOString().slice(0, 10);
+      }
+      const parsed = new Date(serial);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString().slice(0, 10);
+      }
+      return null;
+    }
+
+    // Import transactions with column mapping
+    app.post('/import-transactions', async (req, res) => {
+      const { rows, uploaderEmail, fileName, organizationId, columnMap } = req.body;
+      if (!Array.isArray(rows)) return res.status(400).json({ error: 'Rows array required' });
+
+      await pool.query(
+        `INSERT INTO AuditUploads (UploaderEmail, FileName, RowCount, OrganizationID) VALUES (?, ?, ?, ?)`,
+        [uploaderEmail || 'unknown', fileName || '', rows.length, organizationId || null]
+      );
+
+      let inserted = 0;
+      for (const row of rows) {
+        try {
+          const dbRow = {};
+          Object.keys(columnMap).forEach(dbField => {
+            dbRow[dbField] = row[columnMap[dbField]] || null;
+          });
+          console.log('Inserting row:', dbRow);
+
+          const txnDateRaw = dbRow.TxnDate || null;
+          const txnDate = excelDateToJSDate(txnDateRaw) || null;
+
+          await pool.query(
+            `INSERT INTO ImportedTransactions
+            (OrganizationID, OrgName, TxnID, TxnDate, Category, Item, Type, Amount, ProjectID, ProjectName)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              dbRow.OrganizationID || organizationId || null,
+              dbRow.OrgName || null,
+              dbRow.TxnID || null,
+              txnDate,
+              dbRow.Category || null,
+              dbRow.Item || null,
+              dbRow.Type || null,
+              dbRow.Amount || 0,
+              dbRow.ProjectID || null,
+              dbRow.ProjectName || null
+            ]
+          );
+          inserted++;
+        } catch (err) {
+          console.error('Failed to insert row:', err);
+        }
+      }
+      res.json({ message: `Imported ${inserted} transactions.` });
+    });
+
+    // Get all imported transactions
+    app.get('/imported-transactions', async (req, res) => {
+      try {
+        const [rows] = await pool.query('SELECT * FROM ImportedTransactions');
+        res.json(rows);
+      } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch imported transactions' });
+      }
+    });
+
+    // Project financials summary
+    app.get('/project-financials', async (req, res) => {
+      try {
+        const [rows] = await pool.query(`
+          SELECT
+            ProjectID,
+            ProjectName,
+            SUM(CASE WHEN LOWER(Type) IN ('income', 'receipt') THEN Amount ELSE 0 END) AS AR,
+            SUM(CASE WHEN LOWER(Type) = 'expense' THEN Amount ELSE 0 END) AS AP
+          FROM ImportedTransactions
+          WHERE ProjectID IS NOT NULL
+          GROUP BY ProjectID, ProjectName
+          ORDER BY ProjectID DESC
+        `);
+        const projects = rows.map(p => ({
+          ProjectID: p.ProjectID,
+          ProjectName: p.ProjectName,
+          AR: Number(p.AR || 0),
+          AP: Number(p.AP || 0),
+          Profit: Number(p.AR || 0) - Number(p.AP || 0),
+          Loss: Number(p.AR || 0) - Number(p.AP || 0) < 0 ? Math.abs(Number(p.AR || 0) - Number(p.AP || 0)) : 0
+        }));
+        res.json(projects);
+      } catch (err) {
+        console.error('Error fetching project financials:', err);
+        res.status(500).json({ error: 'Failed to fetch project financials' });
       }
     });
 

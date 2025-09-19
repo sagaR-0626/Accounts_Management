@@ -1,3 +1,11 @@
+body, html, #root {
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  background: #f5f7fa;
+}
+
 html, body {
   margin: 0 !important;
   padding: 0 !important;
@@ -930,4 +938,12 @@ html, body {
   .stat-item:last-child {
     border-bottom: none;
   }
+}
+
+.dashboard-fullscreen {
+  width: 100vw;
+  height: 100vh;
+  background: #fff;
+  padding: 24px;
+  box-sizing: border-box;
 }
