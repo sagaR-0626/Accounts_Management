@@ -81,14 +81,12 @@ const Dashboard = ({ isLoggedIn, onLogout }) => {
     return org ? JSON.parse(org) : null;
   });
   const [selectedDept, setSelectedDept] = useState(() => localStorage.getItem('selectedDept') || 'all');
-  const [selectedProject, setSelectedProject] = useState(() => {
-    const proj = localStorage.getItem('selectedProject');
-    return proj ? JSON.parse(proj) : null;
-  });
+  const [selectedProject, setSelectedProject] = useState(null);
   const [organizations, setOrganizations] = useState([]);
   const [rawProjects, setRawProjects] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [showNewProjectForm, setShowNewProjectForm] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   // --- Excel/DB Import states ---
   const [excelData, setExcelData] = useState([]);
@@ -126,12 +124,20 @@ const Dashboard = ({ isLoggedIn, onLogout }) => {
 
   // --- Organization selection ---
   const handleOrgSelect = async (orgId) => {
+    setLoading(true);
     setSelectedDept('all');
     setSelectedProject(null);
     setView('dashboard');
     setStep(1);
 
+    // --- Clear previous organization data ---
+    // setImportedRows([]);
+    // setProjectsFromDB([]);
+    // localStorage.removeItem('importedRows');
+    // localStorage.removeItem('selectedOrg');
+
     try {
+      // Fetch organization, projects, departments for the selected org
       const orgRes = await fetch(`${API_BASE}/organizations/${orgId}`);
       const orgData = await orgRes.json();
 
@@ -141,18 +147,34 @@ const Dashboard = ({ isLoggedIn, onLogout }) => {
       const deptRes = await fetch(`${API_BASE}/departments?organizationId=${orgId}`);
       const deptRows = await deptRes.json();
 
+      // --- Fetch transactions for this organization ---
+      const importedRes = await fetch(`${API_BASE}/imported-transactions?organizationId=${orgId}`);
+      const imported = await importedRes.json();
+      setImportedRows(imported);
+      localStorage.setItem('importedRows', JSON.stringify(imported));
+
+      // --- Fetch project financials for this organization ---
+      const projFinRes = await fetch(`${API_BASE}/project-financials?organizationId=${orgId}`);
+      const projFin = await projFinRes.json();
+      setProjectsFromDB(Array.isArray(projFin) ? projFin : []);
+
       const mappedProjects = (projRows || []).map(p => ({
         id: p.ProjectID || p.ProjectId || p.id,
-        name: p.ProjectName || p.Name || '',
-        status: (p.Status || '').toString(),
-        budget: Number(p.Budget || 0),
-        spent: Number(p.Spending || 0),
-        profit: Number(p.Profit !== undefined ? p.Profit : (Number(p.Budget || 0) - Number(p.Spending || 0))),
-        ar: Number(p.AR || 0),
-        ap: Number(p.AP !== undefined ? p.AP : Number(p.Spending || 0)),
-        team: Number(p.Team || 0),
+        name: p.ProjectName || p.Name || p.name || '',
+        status: (p.Status || p.status || '').toString(),
+        budget: Number(p.Budget ?? p.budget ?? 0),
+        spent: Number(p.Spending ?? p.spent ?? 0),
+        profit: Number(
+          p.Profit !== undefined
+            ? p.Profit
+            : (Number(p.Budget ?? p.budget ?? 0) - Number(p.Spending ?? p.spent ?? 0))
+        ),
+        ar: Number(p.AR ?? p.ar ?? 0),
+        ap: Number(p.AP ?? p.ap ?? Number(p.Spending ?? p.spent ?? 0)),
+        team: Number(p.Team ?? p.team ?? 0),
         deadline: p.EndDate || p.deadline || '',
-        departmentName: p.DepartmentName || ''
+        departmentName: p.DepartmentName || p.departmentName || '',
+        transactions: p.transactions || []
       }));
 
       setRawProjects(mappedProjects);
@@ -165,11 +187,13 @@ const Dashboard = ({ isLoggedIn, onLogout }) => {
         color: organizations.find(o => o.id === orgId)?.color || '#3b82f6',
         icon: organizations.find(o => o.id === orgId)?.icon || Building2
       });
+      localStorage.setItem('selectedOrg', JSON.stringify(orgData));
 
       setDepartments((deptRows || []).map(d => ({ id: d.DepartmentID, name: d.Name })));
     } catch (err) {
       console.error('Error selecting organization:', err);
     }
+    setLoading(false);
   };
 
   // --- Excel Upload & Direct Import ---
@@ -211,7 +235,7 @@ const Dashboard = ({ isLoggedIn, onLogout }) => {
       TxnDate: 'TxnDate',
       Category: 'Category',
       Item: 'Item',
-      Type: 'ExpenseType',
+      Type: 'Type', // <-- FIXED: match your Excel column name!
       Amount: 'Amount',
       ProjectID: 'ProjectID',
       ProjectName: 'ProjectName'
@@ -233,6 +257,7 @@ const Dashboard = ({ isLoggedIn, onLogout }) => {
     const importedRes = await fetch(`${API_BASE}/imported-transactions`);
     const imported = await importedRes.json();
     setImportedRows(imported);
+    localStorage.setItem('importedRows', JSON.stringify(imported));
 
     const projFinRes = await fetch(`${API_BASE}/project-financials`);
     const projFin = await projFinRes.json();
@@ -241,6 +266,147 @@ const Dashboard = ({ isLoggedIn, onLogout }) => {
 
   // --- Use calculation logic for dashboard metrics ---
   const dashboardMetrics = calculateDashboardMetrics(importedRows);
+
+  // --- Project selection handler ---
+  const handleProjectSelect = (project) => {
+    setSelectedProject(project);
+    setView('project');
+  };
+
+  // --- Build projects with transactions from importedRows ---
+  useEffect(() => {
+    // Group transactions by ProjectID
+    const txByProject = {};
+    const orgLevelTxs = [];
+    importedRows.forEach(tx => {
+      const pid = tx.ProjectID || tx.ProjectId || tx.projectId || '';
+      if (pid) {
+        if (!txByProject[pid]) txByProject[pid] = [];
+        txByProject[pid].push(tx);
+      } else {
+        // No ProjectID: organization-level transaction
+        orgLevelTxs.push(tx);
+      }
+    });
+
+    // Map projectsFromDB with transactions, budget, spent, etc.
+    const normalizedProjects = (projectsFromDB || []).map(p => ({
+      id: p.ProjectID || p.ProjectId || p.id,
+      name: p.ProjectName || p.Name || p.name || '',
+      status: (p.Status || p.status || '').toString(),
+      budget: Number(p.Budget ?? p.budget ?? 0),
+      spent: Number(p.Spending ?? p.spent ?? 0),
+      profit: Number(
+        p.Profit !== undefined
+          ? p.Profit
+          : (Number(p.Budget ?? p.budget ?? 0) - Number(p.Spending ?? p.spent ?? 0))
+      ),
+      ar: Number(p.AR ?? p.ar ?? 0),
+      ap: Number(p.AP ?? p.ap ?? Number(p.Spending ?? p.spent ?? 0)),
+      team: Number(p.Team ?? p.team ?? 0),
+      deadline: p.EndDate || p.deadline || '',
+      departmentName: p.DepartmentName || p.departmentName || '',
+      transactions: txByProject[p.ProjectID || p.ProjectId || p.id] || []
+    }));
+
+    // Pass orgLevelTxs to CompanyDashboard as organization.transactions
+    setRawProjects(normalizedProjects);
+    setSelectedOrg(prev => ({
+      ...(prev || {}),
+      transactions: orgLevelTxs // <-- add org-level transactions here
+    }));
+  }, [importedRows, projectsFromDB]);
+
+  // // --- Restore state from localStorage ---
+  // useEffect(() => {
+  //   // Restore importedRows from localStorage if present
+  //   const savedRows = localStorage.getItem('importedRows');
+  //   if (savedRows) {
+  //     setImportedRows(JSON.parse(savedRows));
+  //   }
+  //   // Restore selectedOrg from localStorage if present
+  //   const savedOrg = localStorage.getItem('selectedOrg');
+  //   if (savedOrg) {
+  //     setSelectedOrg(JSON.parse(savedOrg));
+  //   }
+  // }, []);
+
+  // --- Check DB and clear localStorage if empty ---
+  useEffect(() => {
+    const checkDBAndClearLocal = async () => {
+      // Check organizations and importedRows from DB
+      const orgRes = await fetch(`${API_BASE}/organizations`);
+      const orgs = await orgRes.json();
+      const txRes = await fetch(`${API_BASE}/imported-transactions`);
+      const txs = await txRes.json();
+
+      // If DB is empty, clear localStorage
+      if ((!orgs || orgs.length === 0) && (!txs || txs.length === 0)) {
+        localStorage.removeItem('importedRows');
+        localStorage.removeItem('selectedOrg');
+        setImportedRows([]);
+        setSelectedOrg(null);
+      }
+    };
+    checkDBAndClearLocal();
+  }, []);
+
+  // --- Only reload org if organizationId changes ---
+  useEffect(() => {
+    if (location.state?.organizationId && location.state.organizationId !== selectedOrg?.id) {
+      handleOrgSelect(location.state.organizationId);
+      setView('dashboard');
+    } else if (location.state?.forceDashboard && selectedOrg?.id) {
+      setView('dashboard');
+    }
+  }, [location.state?.organizationId, location.state?.forceDashboard]);
+
+  useEffect(() => {
+    if (view === 'dashboard') {
+      // Restore importedRows from localStorage if present
+      const savedRows = localStorage.getItem('importedRows');
+      if (savedRows) {
+        setImportedRows(JSON.parse(savedRows));
+      }
+      // Restore selectedOrg from localStorage if present
+      const savedOrg = localStorage.getItem('selectedOrg');
+      if (savedOrg) {
+        setSelectedOrg(JSON.parse(savedOrg));
+      }
+      // Restore projectsFromDB if present
+      const savedProjects = localStorage.getItem('projectsFromDB');
+      if (savedProjects) {
+        setProjectsFromDB(JSON.parse(savedProjects));
+      }
+    }
+  }, [view]);
+
+  // useEffect(() => {
+  //   if (view === 'dashboard' && selectedOrg?.id) {
+  //     handleOrgSelect(selectedOrg.id);
+  //   }
+  // }, [view, selectedOrg?.id]);
+
+  // --- Save importedRows ---
+  useEffect(() => {
+    if (importedRows && importedRows.length > 0) {
+      localStorage.setItem('importedRows', JSON.stringify(importedRows));
+    }
+  }, [importedRows]);
+
+  // --- Save selectedOrg ---
+  useEffect(() => {
+    if (selectedOrg) {
+      localStorage.setItem('selectedOrg', JSON.stringify(selectedOrg));
+    }
+  }, [selectedOrg]);
+
+  // --- Save projectsFromDB ---
+  useEffect(() => {
+    if (projectsFromDB && projectsFromDB.length > 0) {
+      localStorage.setItem('projectsFromDB', JSON.stringify(projectsFromDB));
+    }
+  }, [projectsFromDB]);
 
   // --- UI ---
   return (
@@ -280,61 +446,9 @@ const Dashboard = ({ isLoggedIn, onLogout }) => {
           }}>
             <h2>Accounts Dashboard</h2>
             <div style={{ marginTop: 40 }}>
-              <p>Upload Excel/CSV to import transactions:</p>
-              <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileUpload} />
+              
             </div>
-            {/* --- Cards Row --- */}
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'row',
-                gap: '32px',
-                width: '100%',
-                margin: '40px 0'
-              }}
-            >
-              <DashboardCard
-                title="Accounts Receivable"
-                value={dashboardMetrics.ar}
-                color="#4caf50"
-                onClick={() => navigate('/arap-breakdown', {
-                  state: {
-                    type: 'ar',
-                    transactions: importedRows,
-                    organization: selectedOrg
-                  }
-                })}
-              />
-              <DashboardCard
-                title="Accounts Payable"
-                value={dashboardMetrics.ap}
-                color="#f44336"
-                onClick={() => navigate('/arap-breakdown', {
-                  state: {
-                    type: 'ap',
-                    transactions: importedRows,
-                    organization: selectedOrg
-                  }
-                })}
-              />
-              <DashboardCard
-                title="Profit"
-                value={dashboardMetrics.profit}
-                color="#2196f3"
-                onClick={() => setModalView('profit')}
-              />
-              <DashboardCard
-                title="Loss"
-                value={dashboardMetrics.loss}
-                color="#ff9800"
-                onClick={() => setModalView('loss')}
-              />
-              <DashboardCard
-                title="Net Margin (%)"
-                value={dashboardMetrics.netMarginPercent}
-                color="#607d8b"
-              />
-            </div>
+            {/* --- Cards Row REMOVED --- */}
             {/* --- Breakdown Modal --- */}
             {modalView && (
               <BreakdownModal
@@ -344,20 +458,26 @@ const Dashboard = ({ isLoggedIn, onLogout }) => {
               />
             )}
             {/* --- Existing CompanyDashboard --- */}
-            <CompanyDashboard
-              organization={selectedOrg}
-              selectedDept={selectedDept}
-              onDeptChange={setSelectedDept}
-              onProjectSelect={setSelectedProject}
-              onAddProject={setShowNewProjectForm}
-              onFileUpload={handleFileUpload}
-              onBack={() => setView('organizations')}
-              projects={rawProjects}
-              totals={dashboardMetrics}
-            />
+            {loading && (
+              <div className="loading">Loading dashboard...</div>
+            )}
+            {!loading && (
+              <CompanyDashboard
+                organization={selectedOrg}
+                selectedDept={selectedDept}
+                onDeptChange={setSelectedDept}
+                onProjectSelect={handleProjectSelect}
+                onAddProject={setShowNewProjectForm}
+                onFileUpload={handleFileUpload}
+                onBack={() => setView('organizations')}
+                projects={rawProjects} // <-- FIXED: use normalized projects with transactions
+                totals={dashboardMetrics}
+              />
+            )}
           </div>
         </div>
       )}
+      {console.log('Dashboard data:', importedRows, projectsFromDB, selectedOrg)}
     </>
   );
 };

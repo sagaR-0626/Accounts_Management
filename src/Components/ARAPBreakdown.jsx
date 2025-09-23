@@ -8,15 +8,33 @@ import { getBreakdownByCategory } from '../utils/Calculations';
 const ARAPBreakdown = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { transactions = [], organization = {}, type } = location.state || {};
+  const { transactions = [], organizationId, orgName, type } = location.state || {};
 
-  // Get breakdown by category
-  const breakdown = getBreakdownByCategory(transactions, type);
+  // Group transactions by project and "Other"
+  const projectMap = {};
+  let otherTotal = 0;
+  transactions.forEach(tx => {
+    const pid = tx.ProjectID || tx.ProjectId || tx.projectId;
+    const amount = Number(tx.Amount || tx.amount || 0);
+    const txType = (tx.Type || tx.type || '').toLowerCase();
+    const isAR = txType === 'income' || txType === 'receipt';
+    const isAP = txType === 'expense' || txType === 'payment';
 
-  // Prepare chart data
-  const categories = Object.keys(breakdown);
-  const amounts = Object.values(breakdown);
-  const totalAmount = amounts.reduce((sum, v) => sum + v, 0);
+    if ((type === 'ar' && isAR) || (type === 'ap' && isAP)) {
+      if (pid) {
+        const pname = tx.ProjectName || tx.projectName || `Project ${pid}`;
+        if (!projectMap[pname]) projectMap[pname] = 0;
+        projectMap[pname] += amount;
+      } else {
+        otherTotal += amount;
+      }
+    }
+  });
+
+  // Prepare chart data: projects + "Other"
+  const chartLabels = [...Object.keys(projectMap), 'Other'];
+  const chartAmounts = [...Object.values(projectMap), otherTotal];
+  const totalAmount = chartAmounts.reduce((sum, v) => sum + v, 0);
 
   const colors = [
     '#3b82f6', '#10b981', '#f97316', '#ef4444', '#8b5cf6',
@@ -24,42 +42,15 @@ const ARAPBreakdown = () => {
   ];
 
   const chartData = {
-    labels: categories,
+    labels: chartLabels,
     datasets: [{
-      data: amounts,
-      backgroundColor: colors.slice(0, categories.length),
+      data: chartAmounts,
+      backgroundColor: colors.slice(0, chartLabels.length),
       borderWidth: 2,
       borderColor: '#fff',
       hoverBorderWidth: 3,
       hoverBorderColor: '#fff'
     }]
-  };
-
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'bottom',
-        labels: {
-          padding: 20,
-          usePointStyle: true,
-          font: {
-            size: 12,
-            weight: 500
-          }
-        }
-      },
-      tooltip: {
-        callbacks: {
-          label: function(context) {
-            const value = context.parsed;
-            const percentage = ((value / totalAmount) * 100).toFixed(1);
-            return `${context.label}: ₹${value.toLocaleString()} (${percentage}%)`;
-          }
-        }
-      }
-    }
   };
 
   const titleText = type === 'ar' ? 'Accounts Receivable' : 'Accounts Payable';
@@ -74,24 +65,13 @@ const ARAPBreakdown = () => {
         {/* Small, left-aligned AR/AP breakdown header */}
         <div style={{ marginTop: 24, marginBottom: 16 }}>
           <button
-            onClick={() => navigate(-1)}
-            style={{
-              background: '#fff',
-              border: '1px solid #e5e7eb',
-              padding: '8px 8px',
-              borderRadius: 8,
-              cursor: 'pointer',
-              fontWeight: 500,
-              fontSize: 15,
-              color: '#374151',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.07)',
-              marginRight: 12,
-              marginBottom: 8,
-              display: 'inline-block'
-            }}
-          >
-            ← Back to Dashboard
-          </button>
+  onClick={() => {
+    // Pass organizationId and a flag to force dashboard view
+    navigate('/', { state: { organizationId, forceDashboard: true } });
+  }}
+>
+  ← Back to Dashboard
+</button>
           <span style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -131,7 +111,7 @@ const ARAPBreakdown = () => {
           padding: 24,
           boxShadow: '0 4px 16px rgba(0,0,0,0.04)',
           marginBottom: 24,
-          border: `2px solid ${titleColor}20`
+          border: `2px solid ${type === 'ar' ? '#10b981' : '#f97316'}20`
         }}>
           <div style={{ 
             display: 'flex', 
@@ -145,23 +125,23 @@ const ARAPBreakdown = () => {
               fontWeight: 600,
               color: '#374151'
             }}>
-              Total {titleText}
+              Total {type === 'ar' ? 'Accounts Receivable' : 'Accounts Payable'}
             </h3>
             <div style={{
-              background: `${titleColor}10`,
-              color: titleColor,
+              background: `${type === 'ar' ? '#10b981' : '#f97316'}10`,
+              color: type === 'ar' ? '#10b981' : '#f97316',
               padding: '6px 12px',
               borderRadius: 20,
               fontSize: 12,
               fontWeight: 600
             }}>
-              {categories.length} {categories.length === 1 ? 'Item' : 'Items'}
+              {chartLabels.length} {chartLabels.length === 1 ? 'Item' : 'Projects/Other'}
             </div>
           </div>
           <div style={{ 
             fontSize: 36, 
             fontWeight: 700, 
-            color: titleColor,
+            color: type === 'ar' ? '#10b981' : '#f97316',
             marginBottom: 8
           }}>
             ₹{totalAmount.toLocaleString('en-IN')}
@@ -170,11 +150,11 @@ const ARAPBreakdown = () => {
             fontSize: 14, 
             color: '#6b7280'
           }}>
-            Across {categories.length} categories
+            Across {chartLabels.length} projects/other
           </div>
         </div>
 
-        {/* Chart View (always shown first) */}
+        {/* Chart View */}
         <div style={{
           background: '#fff',
           borderRadius: 16,
@@ -188,18 +168,18 @@ const ARAPBreakdown = () => {
             gap: 12,
             marginBottom: 24
           }}>
-            <BarChart3 size={20} style={{ color: titleColor }} />
+            <BarChart3 size={20} style={{ color: type === 'ar' ? '#10b981' : '#f97316' }} />
             <h3 style={{ 
               margin: 0, 
               fontSize: 20, 
               fontWeight: 600,
               color: '#374151'
             }}>
-              Distribution Analysis
+              Project/Other Distribution
             </h3>
           </div>
 
-          {categories.length > 0 ? (
+          {chartLabels.length > 0 ? (
             <div style={{ 
               height: 400, 
               width: '100%', 
@@ -207,7 +187,29 @@ const ARAPBreakdown = () => {
               justifyContent: 'center',
               alignItems: 'center'
             }}>
-              <Doughnut data={chartData} options={chartOptions} />
+              <Doughnut data={chartData} options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    position: 'bottom',
+                    labels: {
+                      padding: 20,
+                      usePointStyle: true,
+                      font: { size: 12, weight: 500 }
+                    }
+                  },
+                  tooltip: {
+                    callbacks: {
+                      label: function(context) {
+                        const value = context.parsed;
+                        const percentage = ((value / totalAmount) * 100).toFixed(1);
+                        return `${context.label}: ₹${value.toLocaleString()} (${percentage}%)`;
+                      }
+                    }
+                  }
+                }
+              }} />
             </div>
           ) : (
             <div style={{
@@ -217,12 +219,12 @@ const ARAPBreakdown = () => {
             }}>
               <div style={{ fontSize: 48, marginBottom: 16 }}>📊</div>
               <h4 style={{ margin: '0 0 8px 0', color: '#374151' }}>No Data Available</h4>
-              <p style={{ margin: 0 }}>No {titleText.toLowerCase()} records found.</p>
+              <p style={{ margin: 0 }}>No {type === 'ar' ? 'receivable' : 'payable'} records found.</p>
             </div>
           )}
         </div>
 
-        {/* List View (always shown below chart) */}
+        {/* List View: Project/Other breakdown */}
         <div style={{
           background: '#fff',
           borderRadius: 16,
@@ -235,33 +237,33 @@ const ARAPBreakdown = () => {
             borderBottom: '1px solid #f3f4f6',
             background: '#fafbfc'
           }}>
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
               gap: 12
             }}>
-              <List size={20} style={{ color: titleColor }} />
-              <h3 style={{ 
-                margin: 0, 
-                fontSize: 20, 
+              <List size={20} style={{ color: type === 'ar' ? '#10b981' : '#f97316' }} />
+              <h3 style={{
+                margin: 0,
+                fontSize: 20,
                 fontWeight: 600,
                 color: '#374151'
               }}>
-                Detailed Breakdown
+                Project/Other Breakdown
               </h3>
             </div>
           </div>
 
           <div style={{ padding: '0' }}>
-            {categories.length > 0 ? categories.map((cat, idx) => (
+            {chartLabels.length > 0 ? chartLabels.map((label, idx) => (
               <div
-                key={cat}
+                key={label}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '20px 32px',
-                  borderBottom: idx < categories.length - 1 ? '1px solid #f3f4f6' : 'none',
+                  borderBottom: idx < chartLabels.length - 1 ? '1px solid #f3f4f6' : 'none',
                   transition: 'background 0.2s'
                 }}
               >
@@ -280,7 +282,7 @@ const ARAPBreakdown = () => {
                       color: '#374151',
                       marginBottom: 4
                     }}>
-                      {cat}
+                      {label}
                     </div>
                     <div style={{
                       fontSize: 13,
@@ -291,7 +293,7 @@ const ARAPBreakdown = () => {
                       borderRadius: 12,
                       display: 'inline-block'
                     }}>
-                      Category
+                      {label === 'Other' ? 'Non-Project' : 'Project'}
                     </div>
                   </div>
                 </div>
@@ -299,17 +301,17 @@ const ARAPBreakdown = () => {
                   <div style={{
                     fontWeight: 700,
                     fontSize: 18,
-                    color: titleColor,
+                    color: type === 'ar' ? '#10b981' : '#f97316',
                     marginBottom: 4
                   }}>
-                    ₹{breakdown[cat].toLocaleString('en-IN')}
+                    ₹{chartAmounts[idx].toLocaleString('en-IN')}
                   </div>
                   <div style={{
                     fontSize: 13,
                     color: '#6b7280',
                     fontWeight: 500
                   }}>
-                    {((breakdown[cat] / totalAmount) * 100).toFixed(1)}% of total
+                    {((chartAmounts[idx] / totalAmount) * 100).toFixed(1)}% of total
                   </div>
                 </div>
               </div>
@@ -321,7 +323,7 @@ const ARAPBreakdown = () => {
               }}>
                 <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
                 <h4 style={{ margin: '0 0 8px 0', color: '#374151' }}>No Records Found</h4>
-                <p style={{ margin: 0 }}>No {titleText.toLowerCase()} records to display.</p>
+                <p style={{ margin: 0 }}>No {type === 'ar' ? 'receivable' : 'payable'} records to display.</p>
               </div>
             )}
           </div>

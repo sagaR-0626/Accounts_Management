@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Header from './Header'; // <-- Import Header here
 import { ArrowLeft, IndianRupee, TrendingUp, TrendingDown, Receipt, Users, Calendar, BarChart3 } from 'lucide-react';
 import SummaryCard from './SummaryCard';
 import { Doughnut, Bar } from 'react-chartjs-2';
@@ -73,7 +74,8 @@ const CategoryModal = ({ open, onClose, categoryName, spends }) => {
 const ProjectDashboard = ({ project, organization, onBack }) => {
   // All hooks at the top
   const [projectState, setProjectState] = useState(project);
-  const transactions = project?.transactions || [];
+  // Use project.transactions for both real projects and "Other"
+  const transactions = project.transactions || [];
   const [categoryTotals, setCategoryTotals] = useState([]);
   const [spendsByCategory, setSpendsByCategory] = useState({});
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -135,10 +137,9 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
   };
 
   // Normalize names: support DB fields (Budget, Spending) and previous props (budget, spent)
-  const budgetVal = Number(projectState.Budget ?? projectState.budget ?? project.budget ?? 0);
-  // AR = receipts/income, AP = expenses
-  const arVal = Number(projectState.ar ?? project.ar ?? 0);
-  const apVal = Number(projectState.ap ?? project.ap ?? projectState.Spending ?? project.Spending ?? 0);
+  const budgetVal = Number(projectState.Budget ?? projectState.budget ?? 0);
+  const arVal = Number(projectState.ar ?? projectState.AR ?? 0);
+  const apVal = Number(projectState.ap ?? projectState.AP ?? projectState.Spending ?? projectState.spent ?? 0);
   // profit/loss = AR - AP (per your requirement)
   const profitVal = arVal - apVal;
   const profitMargin = budgetVal ? ((profitVal / budgetVal) * 100).toFixed(1) : '0.0';
@@ -152,16 +153,21 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
 
   // 1. Define helpers FIRST
   function isAR(tx) {
-    return tx.ExpenseType && ['receipt', 'income'].includes(tx.ExpenseType.toLowerCase());
+    const type = (tx.Type || tx.type || '').toLowerCase();
+    return type === 'income' || type === 'receipt';
   }
   function isAP(tx) {
-    return tx.ExpenseType && tx.ExpenseType.toLowerCase() === 'expense';
+    const type = (tx.Type || tx.type || '').toLowerCase();
+    return type === 'expense' || type === 'payment';
   }
 
-  // Filter transactions based on dashboardView
-  const filteredTransactions = dashboardView === 'all'
-    ? transactions
-    : transactions.filter(tx => dashboardView === 'ar' ? isAR(tx) : isAP(tx));
+  // Filter transactions and category totals based on dashboardView
+  let filteredTransactions = transactions;
+  if (dashboardView === 'ar') {
+    filteredTransactions = transactions.filter(isAR);
+  } else if (dashboardView === 'ap') {
+    filteredTransactions = transactions.filter(isAP);
+  }
 
   // Recalculate categoryTotals and spendsByCategory for filteredTransactions
   const filteredCatTotals = {};
@@ -198,39 +204,12 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
 
   return (
     <div className="dashboard-main">
+      <Header isLoggedIn={true} /> {/* <-- Add Header here */}
       <div className="dashboard-container">
-        {/* Header */}
-        <div className="project-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-            <button onClick={onBack} className="back-btn">
-              <ArrowLeft size={20} />
-              Back
-            </button>
-            <div>
-              <h1 style={{ margin: 0 }}>
-                {projectState.Name || projectState.name || projectState.ProjectName || project.Name}
-              </h1>
-              <p style={{ margin: 0, fontSize: 14 }}>
-                {projectState.ProjectID ?? projectState.id ?? project.ProjectID ?? project.id}
-                {organization && organization.name ? ` - ${organization.name}` : ''}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setAddModalOpen(true)}
-            style={{
-              border: 'none',
-              background: '#2563eb',
-              color: '#fff',
-              padding: '8px 12px',
-              borderRadius: 6,
-              cursor: 'pointer'
-            }}
-          >
-            + Add Transaction
-          </button>
-        </div>
-
+        <button onClick={onBack} className="back-btn">← Back</button>
+        <h1>
+          {project.isOther ? 'Other (Non-Project) Transactions' : project.name}
+        </h1>
         {/* REMOVE TOP SUMMARY CARDS */}
         {/* Summary Cards: AR, AP, Profit/Loss side by side in second row */}
         <div className="financial-details-grid" style={{ marginTop: 18 }}>
@@ -253,7 +232,7 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
             <div style={{ fontSize: '2rem', fontWeight: 700, color: '#10b981', marginBottom: '1rem' }}>
               {arVal.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
             </div>
-            <p stylclientse={{ color: '#6b7280', marginBottom: '1.5rem' }}>
+            <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
              
             </p>
             <div style={{ padding: '1rem', borderRadius: 12, background: 'rgba(16,185,129,0.1)' }}>

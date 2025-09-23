@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, IndianRupee } from 'lucide-react';
 import { Doughnut } from 'react-chartjs-2'; // Make sure this import is present
 import SummaryCard from './SummaryCard';
 import ProjectCard from './ProjectCard';
+import ProjectDashboard from './ProjectDashboard'; // Make sure this import is present
 import { useNavigate } from 'react-router-dom';
 
 const CompanyDashboard = ({
@@ -12,14 +13,20 @@ const CompanyDashboard = ({
   onProjectSelect,
   onAddProject,
   onFileUpload,
-  onBack,           // <-- Add this line
+  onBack,
   projects = [],
   totals = { ar: 0, ap: 0 },
 }) => {
   const navigate = useNavigate();
-  // Tab state: 'all', 'ar', 'ap'
   const [dashboardView, setDashboardView] = useState('all');
-  const [modalView, setModalView] = useState(null); // 'ar' | 'ap' | null
+  const [modalView, setModalView] = useState(null);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [view, setView] = useState('dashboard');
+
+  // --- FIX: Reset dashboardView to 'all' when org/projects change ---
+  useEffect(() => {
+    setDashboardView('all');
+  }, [organization, projects]);
 
   // Filter projects by department and AR/AP tab
   const visibleProjects = projects.filter((project) => {
@@ -35,13 +42,12 @@ const CompanyDashboard = ({
 
   // Filter transactions for AR/AP tab (company level)
   const allTxs = projects.flatMap((p) => p.transactions || []);
-  const filteredTxs = allTxs.filter((tx) =>
-    dashboardView === 'ar'
-      ? (tx.ExpenseType || tx.expenseType) === 'Income'
-      : dashboardView === 'ap'
-      ? (tx.ExpenseType || tx.expenseType) === 'Expense'
-      : true
-  );
+  const filteredTxs = allTxs.filter((tx) => {
+    const type = (tx.Type || tx.type || '').toLowerCase();
+    if (dashboardView === 'ar') return type === 'income' || type === 'receipt';
+    if (dashboardView === 'ap') return type === 'expense' || type === 'payment';
+    return true;
+  });
 
   // Category breakdown for AR/AP tab
   const categoryTotals = [];
@@ -66,18 +72,20 @@ const CompanyDashboard = ({
   const projectsAR = projects.reduce((sum, p) => sum + (p.ar || 0), 0);
   const projectsAP = projects.reduce((sum, p) => sum + (p.ap || 0), 0);
 
-  // Calculate AR/AP from "Other" (already done)
-  const otherTxs = (organization?.transactions || []).filter(tx => !tx.projectId && !tx.project);
-  const otherAR = otherTxs.filter(tx => (tx.ExpenseType || tx.expenseType) === 'Income')
-    .reduce((sum, tx) => sum + Number(tx.Amount || tx.amount || 0), 0);
-  const otherAP = otherTxs.filter(tx => (tx.ExpenseType || tx.expenseType) === 'Expense')
-    .reduce((sum, tx) => sum + Number(tx.Amount || tx.amount || 0), 0);
+  // Calculate AR/AP from "Other" (organization-level transactions)
+  const otherTxs = (organization?.transactions || []).filter(tx => !tx.ProjectID && !tx.ProjectId && !tx.projectId);
+  const otherAR = otherTxs.filter(tx => {
+    const type = (tx.Type || tx.type || '').toLowerCase();
+    return type === 'income' || type === 'receipt';
+  }).reduce((sum, tx) => sum + Number(tx.Amount || tx.amount || 0), 0);
+  const otherAP = otherTxs.filter(tx => {
+    const type = (tx.Type || tx.type || '').toLowerCase();
+    return type === 'expense' || type === 'payment';
+  }).reduce((sum, tx) => sum + Number(tx.Amount || tx.amount || 0), 0);
 
   // Company totals (projects + other)
   const companyAR = projectsAR + otherAR;
   const companyAP = projectsAP + otherAP;
-
-  // Use these for the summary cards:
   const summaryTotals = { ar: companyAR, ap: companyAP };
 
   // For modal chart and breakdown (move this inside the component)
@@ -102,6 +110,15 @@ const CompanyDashboard = ({
     ar: vals.ar,
     ap: vals.ap
   }));
+
+  const handleProjectSelect = (project) => {
+    navigate(`/project/${project.id}`, {
+      state: {
+        project,
+        organization
+      }
+    });
+  };
 
   return (
     <div className="dashboard-main">
@@ -135,6 +152,7 @@ const CompanyDashboard = ({
             >
               + Add Project
             </button>
+            {/* Only one file upload button, styled like the old Upload File button */}
             <label htmlFor="company-upload-file">
               <input
                 id="company-upload-file"
@@ -157,7 +175,7 @@ const CompanyDashboard = ({
                 }}
                 onClick={() => document.getElementById('company-upload-file').click()}
               >
-                📁 Upload File
+                📁 Choose File
               </button>
             </label>
           </div>
@@ -174,9 +192,13 @@ const CompanyDashboard = ({
             changeType="positive"
             onClick={() => navigate('/arap-breakdown', {
               state: {
-                projects: projects || [],
-                organization: organization || { name: 'Uploaded Data' },
-                type: 'ar' // or 'ap'
+                transactions: [
+                  ...projects.flatMap(p => p.transactions || []),
+                  ...(organization?.transactions || [])
+                ],
+                organizationId: organization?.id, // <-- Only pass the ID!
+                orgName: organization?.name || 'Uploaded Data', // <-- If you need the name
+                type: 'ar'
               }
             })}
             style={getCardStyle('ar')}
@@ -190,7 +212,10 @@ const CompanyDashboard = ({
             changeType="negative"
             onClick={() => navigate('/arap-breakdown', {
               state: {
-                projects: projects || [],
+                transactions: [
+                  ...projects.flatMap(p => p.transactions || []),
+                  ...(organization?.transactions || [])
+                ],
                 organization: organization || { name: 'Uploaded Data' },
                 type: 'ap'
               }
@@ -283,42 +308,42 @@ const CompanyDashboard = ({
               {visibleProjects.length} active projects
             </div>
           </div>
-          <div className="projects-grid">
-            {/* Project cards */}
-            {visibleProjects.map((project) => (
-              <ProjectCard
-                key={project.id}
-                project={project}
-                onSelect={onProjectSelect}
-              />
-            ))}
-            {/* Add Other (Non-Project) card if there are any otherTxs */}
-            {otherTxs.length > 0 && (
-              <div
-                className="project-card"
-                style={{
-                  background: '#f3f4f6',
-                  borderRadius: 12,
-                  boxShadow: '0 2px 8px #e0e7ef',
-                  padding: 18,
-                  minWidth: 220,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  margin: '8px 0'
-                }}
-                onClick={() => setModalView('other')}
-                title="View breakdown of non-project transactions"
-              >
-                <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 6 }}>Other (Non-Project)</div>
-                <div style={{ fontSize: 15, color: '#2563eb', marginBottom: 4 }}>AR: ₹{otherAR.toLocaleString()}</div>
-                <div style={{ fontSize: 15, color: '#f59e42', marginBottom: 4 }}>AP: ₹{otherAP.toLocaleString()}</div>
-                <div style={{ fontSize: 14, color: '#666' }}>Click for category breakdown</div>
-              </div>
-            )}
-          </div>
+          {view === 'project' && selectedProject ? (
+            <ProjectDashboard
+              project={selectedProject}
+              organization={organization}
+              onBack={() => {
+                setSelectedProject(null);
+                setView('dashboard');
+              }}
+            />
+          ) : (
+            <div className="projects-grid">
+              {/* Project cards */}
+              {visibleProjects.map((project) => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  onSelect={handleProjectSelect}
+                />
+              ))}
+              {/* Add Other (Non-Project) card if there are any otherTxs */}
+              {otherTxs.length > 0 && (
+                <ProjectCard
+                  key="other"
+                  project={{
+                    id: 'other',
+                    name: 'Other (Non-Project)',
+                    ar: otherAR,
+                    ap: otherAP,
+                    transactions: otherTxs,
+                    isOther: true // flag for display logic
+                  }}
+                  onSelect={handleProjectSelect}
+                />
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

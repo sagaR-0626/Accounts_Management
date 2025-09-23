@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Header from './Header';
 import { Eye, EyeOff, Building2, Lock, Mail, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const LoginScreen = ({ onLogin }) => {
   const [showPassword, setShowPassword] = useState(false);
@@ -8,14 +9,36 @@ const LoginScreen = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const navigate = useNavigate();
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    setTimeout(() => {
+    try {
+      const res = await fetch('http://localhost:3001/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
       setIsLoading(false);
-      if (onLogin) onLogin();
-    }, 800); // Simulate loading
+
+      if (res.ok && data.OrganizationID) {
+        // Route to dashboard with user info
+        navigate('/', {
+          state: {
+            userEmail: data.Email,
+            organizationId: data.OrganizationID,
+          },
+        });
+        if (onLogin) onLogin(data);
+      } else {
+        alert(data.error || 'Login failed');
+      }
+    } catch (err) {
+      setIsLoading(false);
+      alert('Login error');
+    }
   };
 
   const togglePasswordVisibility = () => {

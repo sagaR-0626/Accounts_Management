@@ -4,6 +4,7 @@ const mysql = require('mysql2');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const bcrypt = require('bcrypt');
 
 const app = express();
 const port = 3001;
@@ -218,9 +219,9 @@ adminConn.query(
             d.OrganizationID,
             -- AR = contracted clients + receipts/income recorded in Transactions
             (SELECT IFNULL(SUM(c.ContractAmount),0) FROM Clients c WHERE c.ProjectID = p.ProjectID)
-              + (SELECT IFNULL(SUM(t.Amount),0) FROM Transactions t WHERE t.ProjectID = p.ProjectID AND t.ExpenseType IN ('Receipt','Income')) AS AR,
+              + (SELECT IFNULL(SUM(t.Amount),0) FROM Transactions t WHERE t.ProjectID = p.ProjectID AND t.Type IN ('Receipt','Income')) AS AR,
             -- AP from Transactions (expenses)
-            (SELECT IFNULL(SUM(t2.Amount),0) FROM Transactions t2 WHERE t2.ProjectID = p.ProjectID AND t2.ExpenseType = 'Expense') AS AP
+            (SELECT IFNULL(SUM(t2.Amount),0) FROM Transactions t2 WHERE t2.ProjectID = p.ProjectID AND t2.Type = 'Expense') AS AP
           FROM Projects p
           LEFT JOIN Departments d ON p.DepartmentID = d.DepartmentID
         `;
@@ -510,9 +511,9 @@ adminConn.query(
             d.OrganizationID,
             -- AR: clients contract amounts + receipts/income from Transactions
             (SELECT IFNULL(SUM(c.ContractAmount),0) FROM Clients c WHERE c.ProjectID = p.ProjectID)
-              + (SELECT IFNULL(SUM(t.Amount),0) FROM Transactions t WHERE t.ProjectID = p.ProjectID AND t.ExpenseType IN ('Receipt','Income')) AS AR,
+              + (SELECT IFNULL(SUM(t.Amount),0) FROM Transactions t WHERE t.ProjectID = p.ProjectID AND t.Type IN ('Receipt','Income')) AS AR,
             -- AP from Transactions (expenses)
-            (SELECT IFNULL(SUM(t2.Amount),0) FROM Transactions t2 WHERE t2.ProjectID = p.ProjectID AND t2.ExpenseType = 'Expense') AS AP
+            (SELECT IFNULL(SUM(t2.Amount),0) FROM Transactions t2 WHERE t2.ProjectID = p.ProjectID AND t2.Type = 'Expense') AS AP
           FROM Projects p
           LEFT JOIN Departments d ON p.DepartmentID = d.DepartmentID
         `;
@@ -549,10 +550,10 @@ adminConn.query(
             d.OrganizationID,
             -- Accounts Receivable: clients contract amounts + receipts recorded in Transactions
             (SELECT IFNULL(SUM(c.ContractAmount),0) FROM Clients c WHERE c.ProjectID = p.ProjectID) 
-              + (SELECT IFNULL(SUM(t.Amount),0) FROM Transactions t WHERE t.ProjectID = p.ProjectID AND t.ExpenseType IN ('Receipt','Income')) 
+              + (SELECT IFNULL(SUM(t.Amount),0) FROM Transactions t WHERE t.ProjectID = p.ProjectID AND t.Type IN ('Receipt','Income')) 
               AS AR,
             -- optional: AP derived from Transactions (expenses) if you prefer over p.Spending
-            (SELECT IFNULL(SUM(t2.Amount),0) FROM Transactions t2 WHERE t2.ProjectID = p.ProjectID AND t2.ExpenseType = 'Expense') AS AP_from_txn
+            (SELECT IFNULL(SUM(t2.Amount),0) FROM Transactions t2 WHERE t2.ProjectID = p.ProjectID AND t2.Type = 'Expense') AS AP_from_txn
           FROM Projects p
           LEFT JOIN Departments d ON p.DepartmentID = d.DepartmentID
         `;
@@ -742,6 +743,29 @@ adminConn.query(
       } catch (err) {
         console.error('Error fetching project financials:', err);
         res.status(500).json({ error: 'Failed to fetch project financials' });
+      }
+    });
+
+    // Login API
+    app.post('/login', async (req, res) => {
+      const { email, password } = req.body;
+      try {
+        const [users] = await pool.query('SELECT * FROM Users WHERE Email = ?', [email]);
+        if (!users.length) return res.status(401).json({ error: 'Invalid credentials' });
+
+        const user = users[0];
+        const match = await bcrypt.compare(password, user.Password);
+        if (!match) return res.status(401).json({ error: 'Invalid credentials' });
+
+        // Only return safe fields
+        res.json({
+          UserID: user.UserID,
+          Email: user.Email,
+          Name: user.Name,
+          OrganizationID: user.OrganizationID
+        });
+      } catch (err) {
+        res.status(500).json({ error: 'Login failed' });
       }
     });
 
