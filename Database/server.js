@@ -709,8 +709,15 @@ adminConn.query(
 
     // Get all imported transactions
     app.get('/imported-transactions', async (req, res) => {
+      const organizationId = req.query.organizationId;
       try {
-        const [rows] = await pool.query('SELECT * FROM ImportedTransactions');
+        let query = 'SELECT * FROM ImportedTransactions';
+        let params = [];
+        if (organizationId) {
+          query += ' WHERE OrganizationID = ?';
+          params.push(organizationId);
+        }
+        const [rows] = await pool.query(query, params);
         res.json(rows);
       } catch (err) {
         res.status(500).json({ error: 'Failed to fetch imported transactions' });
@@ -719,8 +726,9 @@ adminConn.query(
 
     // Project financials summary
     app.get('/project-financials', async (req, res) => {
+      const organizationId = req.query.organizationId;
       try {
-        const [rows] = await pool.query(`
+        let query = `
           SELECT
             ProjectID,
             ProjectName,
@@ -728,9 +736,17 @@ adminConn.query(
             SUM(CASE WHEN LOWER(Type) = 'expense' THEN Amount ELSE 0 END) AS AP
           FROM ImportedTransactions
           WHERE ProjectID IS NOT NULL
+        `;
+        let params = [];
+        if (organizationId) {
+          query += ' AND OrganizationID = ?';
+          params.push(organizationId);
+        }
+        query += `
           GROUP BY ProjectID, ProjectName
           ORDER BY ProjectID DESC
-        `);
+        `;
+        const [rows] = await pool.query(query, params);
         const projects = rows.map(p => ({
           ProjectID: p.ProjectID,
           ProjectName: p.ProjectName,

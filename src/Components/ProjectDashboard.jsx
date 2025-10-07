@@ -103,7 +103,7 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
       catTotals[cat] += amt;
       if (!spendsCat[cat]) spendsCat[cat] = [];
       spendsCat[cat].push({
-        item: tx.Item || tx.Note || '',
+        item: tx.Item || tx.item || tx.Description || tx.Name || tx.Note || '', // <-- Add tx.item
         amount: amt,
         date: tx.TxnDate || tx.Date || '',
         note: tx.Note || '',
@@ -173,22 +173,34 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
   const filteredCatTotals = {};
   const filteredSpendsCat = {};
   filteredTransactions.forEach(tx => {
-    const cat = tx.Category || 'Uncategorized';
+    const cat = (tx.Category || tx.category || 'Uncategorized').trim();
     const amt = Number(tx.Amount || 0);
     if (!filteredCatTotals[cat]) filteredCatTotals[cat] = 0;
     filteredCatTotals[cat] += amt;
     if (!filteredSpendsCat[cat]) filteredSpendsCat[cat] = [];
     filteredSpendsCat[cat].push({
-      item: tx.Item || tx.Note || '',
+      item: tx.Item || tx.item || tx.Description || tx.Name || tx.Note || 'Transaction', // <-- covers all cases
       amount: amt,
       date: tx.TxnDate || tx.Date || '',
       note: tx.Note || '',
     });
   });
-  const filteredCategoryTotals = Object.entries(filteredCatTotals).map(([category, total]) => ({ category, total }));
-  const filteredSpendsByCategory = selectedCategory === 'all'
-    ? filteredSpendsCat
-    : { [selectedCategory]: filteredSpendsCat[selectedCategory] || [] };
+
+  const filteredCategoryTotals = Object.entries(filteredCatTotals).map(
+    ([category, total]) => ({ category, total })
+  );
+
+  let filteredSpendsByCategory = {};
+  if (selectedCategory === 'all') {
+    filteredSpendsByCategory = filteredSpendsCat;
+  } else {
+    // Only keep transactions that match the selected category and have a valid item/note
+    filteredSpendsByCategory = {
+      [selectedCategory]: (filteredSpendsCat[selectedCategory] || []).filter(
+        tx => (tx.item || tx.note || '').trim() !== '' // ignore empty placeholders
+      )
+    };
+  }
 
   const categoryList = filteredCategoryTotals.map(c => c.category);
 
@@ -206,7 +218,12 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
     <div className="dashboard-main">
       <Header isLoggedIn={true} /> {/* <-- Add Header here */}
       <div className="dashboard-container">
-        <button onClick={onBack} className="back-btn">← Back</button>
+        <button
+          className="back-btn"
+          onClick={typeof onBack === 'function' ? onBack : () => window.history.back()}
+        >
+          ← Back
+        </button>
         <h1>
           {project.isOther ? 'Other (Non-Project) Transactions' : project.name}
         </h1>
@@ -361,20 +378,40 @@ const ProjectDashboard = ({ project, organization, onBack }) => {
               )}
             </div>
             <div className="chart-description">
-              {filteredCategoryTotals.length === 0 && <div style={{ color: '#666' }}>No spend records yet.</div>}
-              {filteredCategoryTotals.map((c) => (
-                <div key={c.category} className="chart-category-row" onClick={() => openCategory(c.category)}>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>{c.category}</div>
-                    <div style={{ fontSize: 12, color: '#666' }}>
-                      {budgetVal ? ((c.total / budgetVal) * 100).toFixed(1) : '0.0'}% of budget
-                    </div>
+              {selectedCategory === 'all' ? (
+                <>
+                  {filteredCategoryTotals.length === 0 && <div style={{ color: '#666' }}>No spend records yet.</div>}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px', marginBottom: '18px' }}>
+                    {filteredCategoryTotals.map((c, idx) => (
+                      <div
+                        key={c.category}
+                        className="chart-category-row"
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
+                        onClick={() => openCategory(c.category)}
+                      >
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            width: 18,
+                            height: 18,
+                            borderRadius: 4,
+                            background: doughnutData.datasets[0].backgroundColor[idx] || '#ccc',
+                            marginRight: 8,
+                            border: '1.5px solid #e5e7eb'
+                          }}
+                        ></span>
+                        <span style={{ fontWeight: 600 }}>{c.category}</span>
+                        <span style={{ fontWeight: 700, marginLeft: 8 }}>
+                          {c.total.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
+                        </span>
+                      </div>
+                    ))}
+                    {filteredCategoryTotals.length === 0 && (
+                      <div style={{ color: '#666', padding: 12 }}>No category spends to show.</div>
+                    )}
                   </div>
-                  <div style={{ fontWeight: 700 }}>
-                    {c.total.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
-                  </div>
-                </div>
-              ))}
+                </>
+              ) : null}
             </div>
           </div>
         </div>

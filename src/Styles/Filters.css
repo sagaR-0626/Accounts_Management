@@ -67,6 +67,20 @@
   color: #374151;
 }
 
+.filter-select {
+  position: relative;
+  z-index: 10;
+  /* Remove any overflow or height restrictions from parent containers */
+}
+
+/* Ensure parent containers do not restrict dropdown */
+.simple-filters,
+.enhanced-filters,
+.filters-row,
+.filter-block {
+  overflow: visible !important;
+}
+
 /* Responsive: stack on mobile */
 @media (max-width: 700px) {
   .simple-filters, .filters-row {

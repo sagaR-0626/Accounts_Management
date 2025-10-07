@@ -76,11 +76,8 @@ const Dashboard = ({ isLoggedIn, onLogout }) => {
 
   // --- State declarations ---
   const [view, setView] = useState(() => localStorage.getItem('dashboardView') || 'organizations');
-  const [selectedOrg, setSelectedOrg] = useState(() => {
-    const org = localStorage.getItem('selectedOrg');
-    return org ? JSON.parse(org) : null;
-  });
-  const [selectedDept, setSelectedDept] = useState(() => localStorage.getItem('selectedDept') || 'all');
+  const [selectedOrg, setSelectedOrg] = useState(null);
+  const [selectedDept, setSelectedDept] = useState('all');
   const [selectedProject, setSelectedProject] = useState(null);
   const [organizations, setOrganizations] = useState([]);
   const [rawProjects, setRawProjects] = useState([]);
@@ -100,6 +97,14 @@ const Dashboard = ({ isLoggedIn, onLogout }) => {
   // --- Modal state for breakdown ---
   const [modalView, setModalView] = useState(null); // 'ar', 'ap', 'profit', 'loss', null
 
+  // --- Prevent access to other organizations by direct URL ---
+  useEffect(() => {
+    if (selectedOrg && String(selectedOrg.id) !== String(organizationId)) {
+      setView('organizations');
+      setSelectedOrg(null);
+    }
+  }, [selectedOrg, organizationId]);
+
   // --- Load organizations ---
   useEffect(() => {
     const loadOrgs = async () => {
@@ -111,8 +116,9 @@ const Dashboard = ({ isLoggedIn, onLogout }) => {
           name: o.Name,
           type: o.Type || '',
           description: o.Description || '',
-          icon: o.Name && o.Name.toLowerCase().includes('collabridge') ? Code : Building2,
-          color: o.Name && o.Name.toLowerCase().includes('la tierra') ? '#10b981' : '#3b82f6'
+          // Use icon and color from DB, fallback if missing
+          icon: o.icon === 'Code' ? Code : Building2,
+          color: o.color || '#3b82f6'
         }));
         setOrganizations(mapped);
       } catch (err) {
@@ -227,7 +233,6 @@ const Dashboard = ({ isLoggedIn, onLogout }) => {
       rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
     }
 
-    // Default columnMap: each field maps to itself
     const columnMap = {
       OrganizationID: 'Org Id',
       OrgName: 'Org name',
@@ -235,12 +240,13 @@ const Dashboard = ({ isLoggedIn, onLogout }) => {
       TxnDate: 'TxnDate',
       Category: 'Category',
       Item: 'Item',
-      Type: 'Type', // <-- FIXED: match your Excel column name!
+      Type: 'Type',
       Amount: 'Amount',
       ProjectID: 'ProjectID',
       ProjectName: 'ProjectName'
     };
 
+    // --- Upload with orgId ---
     await fetch(`${API_BASE}/import-transactions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -248,20 +254,38 @@ const Dashboard = ({ isLoggedIn, onLogout }) => {
         rows,
         uploaderEmail: userEmail,
         fileName: file.name,
-        organizationId: selectedOrg?.id || null,
+        organizationId: selectedOrg?.id || organizationId, // always tie to org
         columnMap
       })
     });
 
-    // Fetch imported transactions and project financials from DB
-    const importedRes = await fetch(`${API_BASE}/imported-transactions`);
+    // --- Fetch back data for this org only ---
+    const importedRes = await fetch(
+      `${API_BASE}/imported-transactions?organizationId=${selectedOrg?.id || organizationId}`
+    );
     const imported = await importedRes.json();
     setImportedRows(imported);
-    localStorage.setItem('importedRows', JSON.stringify(imported));
 
-    const projFinRes = await fetch(`${API_BASE}/project-financials`);
+    // Save with org-specific key
+    if (selectedOrg?.id || organizationId) {
+      localStorage.setItem(
+        `importedRows_${selectedOrg?.id || organizationId}`,
+        JSON.stringify(imported)
+      );
+    }
+
+    const projFinRes = await fetch(
+      `${API_BASE}/project-financials?organizationId=${selectedOrg?.id || organizationId}`
+    );
     const projFin = await projFinRes.json();
     setProjectsFromDB(Array.isArray(projFin) ? projFin : []);
+
+    if (selectedOrg?.id || organizationId) {
+      localStorage.setItem(
+        `projectsFromDB_${selectedOrg?.id || organizationId}`,
+        JSON.stringify(projFin)
+      );
+    }
   };
 
   // --- Use calculation logic for dashboard metrics ---
@@ -317,96 +341,57 @@ const Dashboard = ({ isLoggedIn, onLogout }) => {
     }));
   }, [importedRows, projectsFromDB]);
 
-  // // --- Restore state from localStorage ---
-  // useEffect(() => {
-  //   // Restore importedRows from localStorage if present
-  //   const savedRows = localStorage.getItem('importedRows');
-  //   if (savedRows) {
-  //     setImportedRows(JSON.parse(savedRows));
-  //   }
-  //   // Restore selectedOrg from localStorage if present
-  //   const savedOrg = localStorage.getItem('selectedOrg');
-  //   if (savedOrg) {
-  //     setSelectedOrg(JSON.parse(savedOrg));
-  //   }
-  // }, []);
-
-  // --- Check DB and clear localStorage if empty ---
+  // --- Restore org-specific data on login or org change ---
   useEffect(() => {
-    const checkDBAndClearLocal = async () => {
-      // Check organizations and importedRows from DB
-      const orgRes = await fetch(`${API_BASE}/organizations`);
-      const orgs = await orgRes.json();
-      const txRes = await fetch(`${API_BASE}/imported-transactions`);
-      const txs = await txRes.json();
-
-      // If DB is empty, clear localStorage
-      if ((!orgs || orgs.length === 0) && (!txs || txs.length === 0)) {
-        localStorage.removeItem('importedRows');
-        localStorage.removeItem('selectedOrg');
-        setImportedRows([]);
-        setSelectedOrg(null);
-      }
-    };
-    checkDBAndClearLocal();
-  }, []);
-
-  // --- Only reload org if organizationId changes ---
-  useEffect(() => {
-    if (location.state?.organizationId && location.state.organizationId !== selectedOrg?.id) {
-      handleOrgSelect(location.state.organizationId);
-      setView('dashboard');
-    } else if (location.state?.forceDashboard && selectedOrg?.id) {
-      setView('dashboard');
+    if (organizationId) {
+      // Restore importedRows for this org only
+      const savedRows = localStorage.getItem(`importedRows_${organizationId}`);
+      setImportedRows(savedRows ? JSON.parse(savedRows) : []);
+      // Restore selectedOrg for this org only
+      const savedOrg = localStorage.getItem(`selectedOrg_${organizationId}`);
+      setSelectedOrg(savedOrg ? JSON.parse(savedOrg) : null);
+      // Restore projectsFromDB for this org only
+      const savedProjects = localStorage.getItem(`projectsFromDB_${organizationId}`);
+      setProjectsFromDB(savedProjects ? JSON.parse(savedProjects) : []);
     }
-  }, [location.state?.organizationId, location.state?.forceDashboard]);
+  }, [organizationId]);
+
+  // --- Save org-specific data whenever it changes ---
+  useEffect(() => {
+    if (organizationId) {
+      localStorage.setItem(`importedRows_${organizationId}`, JSON.stringify(importedRows));
+    }
+  }, [importedRows, organizationId]);
 
   useEffect(() => {
-    if (view === 'dashboard') {
-      // Restore importedRows from localStorage if present
-      const savedRows = localStorage.getItem('importedRows');
-      if (savedRows) {
-        setImportedRows(JSON.parse(savedRows));
-      }
-      // Restore selectedOrg from localStorage if present
-      const savedOrg = localStorage.getItem('selectedOrg');
-      if (savedOrg) {
-        setSelectedOrg(JSON.parse(savedOrg));
-      }
-      // Restore projectsFromDB if present
-      const savedProjects = localStorage.getItem('projectsFromDB');
-      if (savedProjects) {
-        setProjectsFromDB(JSON.parse(savedProjects));
-      }
+    if (organizationId) {
+      localStorage.setItem(`selectedOrg_${organizationId}`, JSON.stringify(selectedOrg));
     }
-  }, [view]);
+  }, [selectedOrg, organizationId]);
 
-  // useEffect(() => {
-  //   if (view === 'dashboard' && selectedOrg?.id) {
-  //     handleOrgSelect(selectedOrg.id);
-  //   }
-  // }, [view, selectedOrg?.id]);
-
-  // --- Save importedRows ---
   useEffect(() => {
-    if (importedRows && importedRows.length > 0) {
-      localStorage.setItem('importedRows', JSON.stringify(importedRows));
+    if (organizationId) {
+      localStorage.setItem(`projectsFromDB_${organizationId}`, JSON.stringify(projectsFromDB));
     }
-  }, [importedRows]);
+  }, [projectsFromDB, organizationId]);
 
-  // --- Save selectedOrg ---
+  // --- Clear org-specific localStorage and state on org change or login ---
   useEffect(() => {
-    if (selectedOrg) {
-      localStorage.setItem('selectedOrg', JSON.stringify(selectedOrg));
+    if (organizationId) {
+      // Remove only org-specific keys
+      localStorage.removeItem(`importedRows_${organizationId}`);
+      localStorage.removeItem(`selectedOrg_${organizationId}`);
+      localStorage.removeItem(`projectsFromDB_${organizationId}`);
+      setImportedRows([]);
+      setSelectedOrg(null);
+      setProjectsFromDB([]);
+      setRawProjects([]);
+      setDepartments([]);
+      setSelectedDept('all');
+      setSelectedProject(null);
+      setView('organizations');
     }
-  }, [selectedOrg]);
-
-  // --- Save projectsFromDB ---
-  useEffect(() => {
-    if (projectsFromDB && projectsFromDB.length > 0) {
-      localStorage.setItem('projectsFromDB', JSON.stringify(projectsFromDB));
-    }
-  }, [projectsFromDB]);
+  }, [organizationId]);
 
   // --- UI ---
   return (
@@ -415,7 +400,14 @@ const Dashboard = ({ isLoggedIn, onLogout }) => {
       {view === 'organizations' && (
         <OrganizationSelector
           organizations={organizations}
-          onSelect={handleOrgSelect}
+          organizationId={organizationId}
+          onSelect={async (orgId) => {
+            // Only allow dashboard open for logged-in org
+            if (String(orgId) === String(organizationId)) {
+              await handleOrgSelect(orgId); // Make sure org data is loaded
+              setView('dashboard');         // Immediately switch view
+            }
+          }}
         />
       )}
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowLeft } from 'lucide-react';
 
-const OrganizationSelector = ({ organizations, onSelect }) => (
+const OrganizationSelector = ({ organizations, onSelect, organizationId }) => (
   <div
     style={{
       width: '100%',
@@ -31,16 +31,19 @@ const OrganizationSelector = ({ organizations, onSelect }) => (
       >
         {organizations.map((org) => {
           const IconComponent = org.icon;
+          const isActive = String(org.id) === String(organizationId);
           return (
             <div
               key={org.id}
-              onClick={() => onSelect(org.id)}
+              onClick={() => isActive && onSelect(org.id)}
               className="org-card"
               style={{
                 background: '#fff',
                 borderRadius: 16,
                 boxShadow: '0 4px 24px rgba(60,72,88,0.10)',
-                cursor: 'pointer',
+                cursor: isActive ? 'pointer' : 'not-allowed',
+                opacity: isActive ? 1 : 0.5,
+                pointerEvents: isActive ? 'auto' : 'none',
                 transition: 'box-shadow 0.2s, transform 0.2s',
                 padding: 0,
                 minHeight: 220,
@@ -51,16 +54,20 @@ const OrganizationSelector = ({ organizations, onSelect }) => (
                 border: '2px solid transparent',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow =
-                  '0 8px 32px rgba(60,72,88,0.16)';
-                e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
-                e.currentTarget.style.border = `2px solid ${org.color}`;
+                if (isActive) {
+                  e.currentTarget.style.boxShadow =
+                    '0 8px 32px rgba(60,72,88,0.16)';
+                  e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
+                  e.currentTarget.style.border = `2px solid ${org.color}`;
+                }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow =
-                  '0 4px 24px rgba(60,72,88,0.10)';
-                e.currentTarget.style.transform = 'none';
-                e.currentTarget.style.border = '2px solid transparent';
+                if (isActive) {
+                  e.currentTarget.style.boxShadow =
+                    '0 4px 24px rgba(60,72,88,0.10)';
+                  e.currentTarget.style.transform = 'none';
+                  e.currentTarget.style.border = '2px solid transparent';
+                }
               }}
             >
               <div
@@ -122,7 +129,7 @@ const OrganizationSelector = ({ organizations, onSelect }) => (
                     padding: '7px 18px',
                     fontWeight: 600,
                     fontSize: 15,
-                    cursor: 'pointer',
+                    cursor: isActive ? 'pointer' : 'not-allowed',
                     boxShadow: '0 2px 8px rgba(60,72,88,0.08)',
                     marginTop: 8,
                     transition: 'background 0.2s',

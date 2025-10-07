@@ -114,8 +114,17 @@ const CompanyDashboard = ({
   const handleProjectSelect = (project) => {
     navigate(`/project/${project.id}`, {
       state: {
-        project,
-        organization
+        project: {
+          id: project.id,
+          name: project.name,
+          ar: project.ar,
+          ap: project.ap,
+          transactions: project.transactions // <-- Pass the full transaction objects!
+        },
+        organization: {
+          id: organization?.id,
+          name: organization?.name
+        }
       }
     });
   };
@@ -216,7 +225,8 @@ const CompanyDashboard = ({
                   ...projects.flatMap(p => p.transactions || []),
                   ...(organization?.transactions || [])
                 ],
-                organization: organization || { name: 'Uploaded Data' },
+                organizationId: organization?.id,
+                orgName: organization?.name || 'Uploaded Data',
                 type: 'ap'
               }
             })}
